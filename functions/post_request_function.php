@@ -11,7 +11,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $folder_name = $_POST['folder_name'] ?? '';
                 if (!empty($folder_name) && strpbrk($folder_name, "\\/?%*:|\"<>") === false && !str_starts_with($folder_name, '.')) {
                     $new_folder_path = $target_dir_path . '/' . $folder_name;
-                    if (!file_exists($new_folder_path)) { mkdir($new_folder_path, 0777, true); $_SESSION['message'] = ['type' => 'success', 'text' => 'フォルダを作成しました。']; } 
+                    if (!file_exists($new_folder_path)) {
+                        mkdir($new_folder_path, 0777, true); $_SESSION['message'] = ['type' => 'success', 'text' => 'フォルダを作成しました。'];
+                        rebuild_dir_cache();
+                    } 
                     else { $_SESSION['message'] = ['type' => 'warning', 'text' => '同じ名前のフォルダが既に存在します。']; }
                 } else { $_SESSION['message'] = ['type' => 'danger', 'text' => '無効なフォルダ名です。 (.で始まる名前や記号は使えません。)']; }
                 break;
@@ -66,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $new_path = $target_dir_path . '/' . $final_new_name;
                 if (strtolower($old_path) === strtolower($new_path)) { break; }
                 if (file_exists($new_path)) { $_SESSION['message'] = ['type' => 'warning', 'text' => '同じ名前のアイテムが既に存在します。']; break; }
-                if (rename($old_path, $new_path)) { $_SESSION['message'] = ['type' => 'success', 'text' => '名前を変更しました。']; } 
+                if (rename($old_path, $new_path)) { 
+                    $_SESSION['message'] = ['type' => 'success', 'text' => '名前を変更しました。'];
+                    rebuild_dir_cache();
+                } 
                 else { $_SESSION['message'] = ['type' => 'danger', 'text' => '名前の変更に失敗しました。サーバーの権限を確認してください。']; }
                 break;
             case 'move_items':
@@ -84,12 +90,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($success_count > 0) $message .= $success_count . '個のアイテムを移動しました。';
                 if ($error_count > 0) $message .= $error_count . '個のアイテムは移動できませんでした（移動先に同名ファイルが存在するか、権限がありません、または隠しアイテムです）。';
                 $_SESSION['message'] = ['type' => $error_count > 0 ? 'warning' : 'success', 'text' => $message];
+                if ($success_count > 0) {
+                    rebuild_dir_cache();
+                }
                 break;
             case 'delete_item':
                 $item_name = $_POST['item_name'] ?? ''; $item_path = realpath($target_dir_path . '/' . $item_name);
                 if ($item_path && strpos($item_path, $target_dir_path) === 0 && !str_starts_with($item_name, '.')) {
                     $is_dir = is_dir($item_path);
-                    if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) { $_SESSION['message'] = ['type' => 'success', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'を削除しました。']; } 
+                    if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) { 
+                        $_SESSION['message'] = ['type' => 'success', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'を削除しました。'];
+                        rebuild_dir_cache();
+                    } 
                     else { $_SESSION['message'] = ['type' => 'danger', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'の削除に失敗しました。']; }
                 } else { $_SESSION['message'] = ['type' => 'danger', 'text' => '対象が見つからないか、削除できないアイテムです。']; }
                 break;

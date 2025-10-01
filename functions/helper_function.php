@@ -71,6 +71,44 @@ function get_directory_tree($base_path) {
     return $build_tree(DATA_ROOT);
 }
 
+/**
+ * ディレクトリ構造のキャッシュを再構築する
+ * @return array 再構築されたキャッシュデータ
+ */
+function rebuild_dir_cache(): array {
+    $tree = get_directory_tree(DATA_ROOT);
+    $list = get_all_directories_recursive(DATA_ROOT);
+    sort($list);
+
+    $cache_data = [
+        'tree' => $tree,
+        'list' => $list
+    ];
+
+    $cache_file_path = DATA_ROOT . DIRECTORY_SEPARATOR . DIR_CACHE_PATH;
+    file_put_contents($cache_file_path, json_encode($cache_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+    return $cache_data;
+}
+
+/**
+ * ディレクトリ構造のキャッシュを読み込む
+ * @return array キャッシュデータ
+ */
+function load_dir_cache(): array {
+    $cache_file_path = DATA_ROOT . DIRECTORY_SEPARATOR . DIR_CACHE_PATH;
+
+    if (file_exists($cache_file_path)) {
+        $cache_content = file_get_contents($cache_file_path);
+        $cache_data = json_decode($cache_content, true);
+        if (is_array($cache_data) && isset($cache_data['tree']) && isset($cache_data['list'])) {
+            return $cache_data;
+        }
+    }
+    // ファイルが存在しない、または内容が不正な場合は再構築
+    return rebuild_dir_cache();
+}
+
 // バイト数を読みやすいMB形式にフォーマットする
 function format_bytes($bytes, $precision = 2) {
     if ($bytes === null || !is_numeric($bytes) || $bytes < 0) return '-';

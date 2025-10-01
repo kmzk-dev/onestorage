@@ -41,9 +41,12 @@ foreach ($all_items as $item) {
     ];
 }
 usort($items, fn($a, $b) => ($a['is_dir'] !== $b['is_dir']) ? ($a['is_dir'] ? -1 : 1) : strcasecmp($a['name'], $b['name']));
-$sidebar_folders = get_directory_tree(DATA_ROOT);
-$all_dirs = get_all_directories_recursive(DATA_ROOT);
-sort($all_dirs);
+// $sidebar_folders = get_directory_tree(DATA_ROOT);
+// $all_dirs = get_all_directories_recursive(DATA_ROOT);
+// sort($all_dirs);
+$dir_cache = load_dir_cache();
+$sidebar_folders = $dir_cache['tree'];
+$all_dirs = $dir_cache['list'];
 $breadcrumbs = [];
 if (!empty($web_path)) {
     $tmp_path = '';
