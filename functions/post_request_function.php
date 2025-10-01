@@ -1,5 +1,7 @@
 <?php
-require_once __DIR__ . '/helper_function.php'; 
+require_once __DIR__ . '/helper_function.php';
+require_once __DIR__ . '/upload_function.php'; // 新しいアップロード関数を読み込む
+
 // --- POSTリクエスト処理 ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? ''; $path_from_form = $_POST['path'] ?? ''; $target_dir_path = realpath(DATA_ROOT . '/' . $path_from_form);
@@ -18,46 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     else { $_SESSION['message'] = ['type' => 'warning', 'text' => '同じ名前のフォルダが既に存在します。']; }
                 } else { $_SESSION['message'] = ['type' => 'danger', 'text' => '無効なフォルダ名です。 (.で始まる名前や記号は使えません。)']; }
                 break;
-            
-            case 'upload_file':
-                $max_size_bytes = $file_config['max_file_size_mb'] * 1024 * 1024;
-                $allowed_extensions = array_map('strtolower', $file_config['allowed_extensions']);
-                $response = ['type' => 'danger', 'text' => 'ファイルのアップロードに失敗しました。'];
 
-                if (isset($_FILES['files'])) {
-                    $success_count = 0; $upload_limit_error = false; $ext_error_count = 0; $size_error_count = 0;
-
-                    for ($i = 0; $i < count($_FILES['files']['name']); $i++) { 
-                        $file_data = [
-                            'name' => basename($_FILES['files']['name'][$i]), 'tmp_name' => $_FILES['files']['tmp_name'][$i],
-                            'error' => $_FILES['files']['error'][$i], 'size' => $_FILES['files']['size'][$i]
-                        ];
-                        if ($file_data['error'] === UPLOAD_ERR_INI_SIZE || $file_data['error'] === UPLOAD_ERR_FORM_SIZE) { $upload_limit_error = true; continue; }
-                        if ($file_data['error'] !== UPLOAD_ERR_OK || empty($file_data['name']) || str_starts_with($file_data['name'], '.')) { continue; }
-                        
-                        $extension = strtolower(pathinfo($file_data['name'], PATHINFO_EXTENSION));
-                        if (!empty($allowed_extensions) && !in_array($extension, $allowed_extensions)) { $ext_error_count++; continue; }
-                        if ($file_data['size'] > $max_size_bytes) { $size_error_count++; continue; }
-                        if (move_uploaded_file($file_data['tmp_name'], $target_dir_path . '/' . $file_data['name'])) { $success_count++; }
-                    }
-
-                    $message_parts = [];
-                    if ($success_count > 0) { $message_parts[] = $success_count . '個のファイルをアップロードしました。'; }
-                    if ($ext_error_count > 0) { $message_parts[] = $ext_error_count . '個のファイルは未許可の拡張子のためスキップされました。'; }
-                    if ($size_error_count > 0) { $message_parts[] = $size_error_count . '個のファイルはファイルサイズ上限(' . $file_config['max_file_size_mb'] . 'MB)を超過したためスキップされました。'; }
-                    if ($upload_limit_error) { $message_parts[] = '一部のファイルはサーバーのアップロード制限を超過したため失敗しました。'; }
-
-                    if (!empty($message_parts)) {
-                        $type = ($success_count > 0 && $ext_error_count + $size_error_count === 0 && !$upload_limit_error) ? 'success' : 'warning';
-                        if ($ext_error_count + $size_error_count > 0 || $upload_limit_error) $type = 'warning';
-                        if ($success_count === 0 && ($ext_error_count > 0 || $size_error_count > 0 || $upload_limit_error)) $type = 'danger';
-                        $response = ['type' => $type, 'text' => implode(' ', $message_parts)];
-                    }
-                }
-                
-                header('Content-Type: application/json');
-                echo json_encode($response);
-                exit;
+            case 'upload_chunk':
+                handle_chunk_upload($target_dir_path);
+                // handle_chunk_upload 内で exit するため、ここでは何も実行されない
+                break;
 
             case 'rename_item':
                 $old_name = $_POST['old_name'] ?? ''; $new_name_input = $_POST['new_name'] ?? ''; $old_path = realpath($target_dir_path . '/' . $old_name);

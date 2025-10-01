@@ -32,7 +32,7 @@ foreach ($all_items as $item) {
     if (str_starts_with($item, '.')) continue;
     $item_path = $current_path . '/' . $item;
     $is_dir = is_dir($item_path);
-    $size = $is_dir ? null : filesize($item_path);
+    $size = $is_dir ? get_directory_size($item_path) : filesize($item_path);
     $items[] = [
         'name' => $item,
         'is_dir' => $is_dir,
@@ -41,9 +41,6 @@ foreach ($all_items as $item) {
     ];
 }
 usort($items, fn($a, $b) => ($a['is_dir'] !== $b['is_dir']) ? ($a['is_dir'] ? -1 : 1) : strcasecmp($a['name'], $b['name']));
-// $sidebar_folders = get_directory_tree(DATA_ROOT);
-// $all_dirs = get_all_directories_recursive(DATA_ROOT);
-// sort($all_dirs);
 $dir_cache = load_dir_cache();
 $sidebar_folders = $dir_cache['tree'];
 $all_dirs = $dir_cache['list'];
@@ -166,7 +163,7 @@ $json_message = json_encode($message);
                                         </a>
                                     <?php endif; ?>
                                 </div>
-                                <div class="col-3 d-none col-lg-2 text-end py-2">
+                                <div class="col-3 d-none d-md-block col-lg-2 text-end py-2">
                                     <?= htmlspecialchars($item['formatted_size'], ENT_QUOTES, 'UTF-8') ?>
                                 </div>
                                 <div class="col-auto py-2">
@@ -298,82 +295,149 @@ $json_message = json_encode($message);
 
             adjustLayout();
             window.addEventListener('resize', adjustLayout);
+            
+        const uploadFileForm = document.getElementById('uploadFileForm');
+        if (uploadFileForm) {
+            const uploadModalEl = document.getElementById('uploadFileModal');
+            const uploadModal = new bootstrap.Modal(uploadModalEl);
+            const submitBtn = document.getElementById('uploadSubmitBtn');
+            const filesInput = document.getElementById('files');
+            const progressContainer = document.getElementById('uploadProgressContainer');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const uploadFileName = document.getElementById('uploadFileName');
+            const uploadStatusText = document.getElementById('uploadStatusText');
+            const closeBtnFooter = document.getElementById('uploadModalFooterCloseBtn');
 
-            const uploadFileForm = document.getElementById('uploadFileForm');
-            if (uploadFileForm) {
-                const uploadModalEl = document.getElementById('uploadFileModal');
-                const uploadModal = new bootstrap.Modal(uploadModalEl);
-                let isUploading = false;
+            let isUploading = false;
+            let uploadQueue = [];
 
-                uploadModalEl.addEventListener('hide.bs.modal', function(event) {
-                    if (isUploading) {
-                        event.preventDefault();
-                    }
-                });
+            uploadModalEl.addEventListener('hide.bs.modal', function (event) {
+                if (isUploading) {
+                    event.preventDefault();
+                    showToast('warning', 'アップロード処理が完了するまでモーダルを閉じることはできません。');
+                }
+            });
 
-                uploadFileForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    isUploading = true;
+            uploadFileForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (isUploading) return;
+                
+                if (filesInput.files.length === 0) {
+                    showToast('warning', 'ファイルが選択されていません。');
+                    return;
+                }
+                
+                uploadQueue = Array.from(filesInput.files);
+                processUploadQueue();
+            });
+            
+            async function processUploadQueue() {
+                if (uploadQueue.length === 0) {
+                    isUploading = false;
+                    showToast('success', 'すべてのファイルのアップロードが完了しました。');
+                     setTimeout(() => {
+                        location.reload();
+                    }, 800);
+                    return;
+                }
 
-                    const submitBtn = document.getElementById('uploadSubmitBtn');
-                    const closeBtnHeader = document.getElementById('uploadModalCloseBtn');
-                    const closeBtnFooter = document.getElementById('uploadModalFooterCloseBtn');
-                    const originalBtnHtml = submitBtn.innerHTML;
-                    const filesInput = document.getElementById('files');
+                isUploading = true;
+                setUploadUiState(true);
 
-                    if (filesInput.files.length === 0) {
-                        showToast('warning', 'ファイルが選択されていません。');
-                        isUploading = false;
+                const file = uploadQueue.shift(); // キューの先頭からファイルを取得
+                
+                // .で始まるファイルのアップロードを禁止
+                if (file.name.startsWith('.')) {
+                    showToast('warning', `[${file.name}] はドットで始まるためスキップされました。`);
+                    processUploadQueue(); // 次のファイルへ
+                    return;
+                }
+                
+                await uploadFileInChunks(file);
+
+                processUploadQueue(); // 次のファイルの処理へ
+            }
+
+            async function uploadFileInChunks(file) {
+                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
+                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                let chunkIndex = 0;
+                
+                updateProgress(0, file.name, `(1/${totalChunks})`);
+
+                for (chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                    const start = chunkIndex * CHUNK_SIZE;
+                    const end = Math.min(start + CHUNK_SIZE, file.size);
+                    const chunk = file.slice(start, end);
+
+                    const formData = new FormData();
+                    formData.append('action', 'upload_chunk');
+                    formData.append('path', document.getElementById('upload_path').value);
+                    formData.append('chunk', chunk, file.name);
+                    formData.append('original_name', file.name);
+                    formData.append('chunk_index', chunkIndex);
+                    formData.append('total_chunks', totalChunks);
+                    formData.append('total_size', file.size);
+                    
+                    try {
+                        const response = await fetch('index.php', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error('サーバーエラーが発生しました。');
+                        }
+
+                        const data = await response.json();
+                        
+                        if (data.type === 'danger' || data.type === 'warning') {
+                            throw new Error(data.text);
+                        }
+
+                        if (data.type === 'success') {
+                             updateProgress(100, file.name, '完了');
+                        } else {
+                            const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                            updateProgress(progress, file.name, `(${chunkIndex + 2 > totalChunks ? totalChunks : chunkIndex + 2}/${totalChunks})`);
+                        }
+
+                    } catch (error) {
+                        showToast('danger', `[${file.name}] のアップロードに失敗しました: ${error.message}`);
+                        setUploadUiState(false);
+                        uploadQueue = []; // エラーが発生したらキューをクリア
                         return;
                     }
-
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> アップロード中...`;
-                    closeBtnHeader.disabled = true;
-                    closeBtnFooter.disabled = true;
-
-                    const formData = new FormData(this);
-
-                    fetch('index.php', {
-                            method: 'POST',
-                            body: formData,
-                        })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error('サーバーエラーが発生しました。');
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            if (data && data.type && data.text) {
-                                if (data.type === 'success' || data.type === 'warning') {
-                                    isUploading = false;
-                                    uploadModal.hide();
-                                    showToast(data.type, data.text);
-                                    setTimeout(() => {
-                                        location.reload();
-                                    }, 800);
-                                } else {
-                                    showToast(data.type, data.text);
-                                }
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Upload Error:', error);
-                            showToast('danger', 'アップロード処理中にエラーが発生しました。');
-                        })
-                        .finally(() => {
-                            if (isUploading) {
-                                isUploading = false;
-                                submitBtn.disabled = false;
-                                submitBtn.innerHTML = originalBtnHtml;
-                                closeBtnHeader.disabled = false;
-                                closeBtnFooter.disabled = false;
-                                uploadFileForm.reset();
-                            }
-                        });
-                });
+                }
             }
+            
+            function setUploadUiState(uploading) {
+                isUploading = uploading;
+                submitBtn.disabled = uploading;
+                closeBtnFooter.disabled = uploading;
+                filesInput.disabled = uploading;
+
+                if (uploading) {
+                    progressContainer.classList.remove('d-none');
+                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> アップロード中...`;
+                } else {
+                    progressContainer.classList.add('d-none');
+                    submitBtn.innerHTML = 'アップロード';
+                    uploadFileForm.reset();
+                }
+            }
+
+            function updateProgress(percentage, name, status) {
+                uploadFileName.textContent = name;
+                progressBar.style.width = percentage + '%';
+                progressBar.setAttribute('aria-valuenow', percentage);
+                progressBar.textContent = percentage + '%';
+            }
+        }
+
+
+
+
 
             const selectAllCheckbox = document.getElementById('selectAllCheckbox');
             const itemCheckboxes = document.querySelectorAll('.item-checkbox');

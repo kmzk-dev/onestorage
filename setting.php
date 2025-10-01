@@ -64,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'mp4',
                     'zip',
                 ],
-                'max_file_size_mb' => 150
+                'max_file_size_mb' => 500
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             try {
                 file_put_contents(ACCEPT_CONFIG_PATH, $accept_config_content);

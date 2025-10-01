@@ -16,6 +16,7 @@ if (!isset($main_config['data_root'])) {
 }
 define('DATA_ROOT', $main_config['data_root']);
 
+global $file_config; // チャンク処理関数からアクセスするためにglobal宣言を追加
 // アップロードするファイル種別
 $file_config = [
     'allowed_extensions' => [],

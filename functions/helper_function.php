@@ -116,3 +116,66 @@ function format_bytes($bytes, $precision = 2) {
     $megabytes = $bytes / (1024 * 1024);
     return number_format($megabytes, 2) . ' MB';
 }
+
+/* ディレクトリの合計サイズを再帰的に取得する
+ * @param string $dir ディレクトリのパス
+ * @return int 合計サイズ（バイト）
+ */
+function get_directory_size(string $dir): int {
+    // ディレクトリが読み取り可能かチェック
+    if (!is_readable($dir)) {
+        return 0;
+    }
+
+    $size = 0;
+    $items = scandir($dir);
+
+    // scandirが失敗した場合（パーミッションエラーなど）
+    if ($items === false) {
+        return 0;
+    }
+
+    foreach ($items as $item) {
+        if ($item == '.' || $item == '..') continue;
+        
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+
+        // アイテムが読み取り不可の場合はスキップ
+        if (!is_readable($path)) continue;
+
+        if (is_dir($path)) {
+            $size += get_directory_size($path); //TODO: サブフォルダも再帰的に計算:オーバースペックの可能性があるので要考慮
+        } else {
+            $size += filesize($path);
+        }
+    }
+    return $size;
+}
+
+/**
+ * 古いチャンクファイルをクリーンアップする (24時間以上経過)
+ * @return int 削除したファイル数
+ */
+function cleanup_stale_chunks(): int {
+    $temp_dir = DATA_ROOT . DIRECTORY_SEPARATOR . '.temp_chunks';
+    if (!is_dir($temp_dir)) {
+        return 0;
+    }
+
+    $deleted_count = 0;
+    $one_day_ago = time() - (24 * 60 * 60);
+
+    foreach (scandir($temp_dir) as $file) {
+        if ($file === '.' || $file === '..' || $file === '.htaccess') {
+            continue;
+        }
+
+        $file_path = $temp_dir . DIRECTORY_SEPARATOR . $file;
+        if (filemtime($file_path) < $one_day_ago) {
+            if (unlink($file_path)) {
+                $deleted_count++;
+            }
+        }
+    }
+    return $deleted_count;
+}
