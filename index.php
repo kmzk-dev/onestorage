@@ -158,7 +158,7 @@ $json_message = json_encode($message);
                                         </a>
                                     <?php endif; ?>
                                 </div>
-                                <div class="col-3 col-lg-2 text-end py-2">
+                                <div class="col-3 d-none col-lg-2 text-end py-2">
                                     <?= htmlspecialchars($item['formatted_size'], ENT_QUOTES, 'UTF-8') ?>
                                 </div>
                                 <div class="col-auto py-2">
