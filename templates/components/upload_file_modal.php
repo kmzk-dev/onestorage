@@ -1,23 +1,37 @@
 <div class="modal fade" id="uploadFileModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-dark text-light">
                 <h5 class="modal-title">ファイルのアップロード</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" id="uploadModalCloseBtn"></button>
             </div>
             <form id="uploadFileForm" action="index.php" method="post" enctype="multipart/form-data">
                 <div class="modal-body">
+                    <div class="mb-3">
+                        <span class="fw-bold">ファイルアップロード先:</span>
+                        <p class="mb-1 text-break">
+                            <i class="bi bi-folder-fill me-1"></i>
+                            home/<?= htmlspecialchars(empty($web_path) ? '' : $web_path, ENT_QUOTES, 'UTF-8') ?>
+                        </p>
+                    </div>
                     <input type="hidden" name="action" value="upload_file">
                     <input type="hidden" name="path" value="<?= htmlspecialchars($web_path, ENT_QUOTES, 'UTF-8') ?>">
                     <div class="mb-3">
-                        <label for="files" class="form-label">アップロードするファイルを選択 (複数可)</label>
                         <input class="form-control" type="file" id="files" name="files[]" multiple required accept="<?= htmlspecialchars($accept_attribute, ENT_QUOTES, 'UTF-8') ?>">
                     </div>
                     <div class="form-text">
-                        アップロード先: /<?= htmlspecialchars(empty($web_path) ? '' : $web_path . '/', ENT_QUOTES, 'UTF-8') ?><br>
-                        <?= !empty($file_config['allowed_extensions']) ? '許可する拡張子: ' . htmlspecialchars(implode(', ', $file_config['allowed_extensions']), ENT_QUOTES, 'UTF-8') . '<br>' : '' ?>
-                        ファイルサイズ上限: <?= htmlspecialchars($file_config['max_file_size_mb'], ENT_QUOTES, 'UTF-8') ?> MB<br>
-                        `.`で始まるファイル名はアップロードできません。
+                        <span class="fw-bold">許可する拡張子:</br></span>
+                        <div class="alert alert-light" role="alert">
+                            <?= !empty($file_config['allowed_extensions']) ? '' . htmlspecialchars(implode(', ', $file_config['allowed_extensions']), ENT_QUOTES, 'UTF-8') . '<br>' : '' ?>
+                        </div>
+                        <ul>
+                            <li>ファイルサイズ上限: </span><?= htmlspecialchars($file_config['max_file_size_mb'], ENT_QUOTES, 'UTF-8') ?> MB</li>
+                            <li> . で始まる名前のファイルはアップロードできません</li>
+                            <li>フォルダはアップロードできません</li>
+                        </ul>
+                        <div>
+                            <span class="fw-bold">
+                        </div>
+                        <span class="fw-bold"></span>
                     </div>
                 </div>
                 <div class="modal-footer">
