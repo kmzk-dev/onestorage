@@ -1,13 +1,15 @@
 <?php
 require_once __DIR__ . '/functions/helper_function.php';
+require_once __DIR__ . '/functions/cookie_function.php'; // 追加
 
-$_SESSION = [];
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
-    );
+// 認証クッキーを削除
+clear_auth_cookie(); // 修正
+
+// フラッシュメッセージのためセッションの開始と破棄は維持
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
+$_SESSION = [];
 session_destroy();
+
 redirect('index.php');

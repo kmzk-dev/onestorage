@@ -11,6 +11,7 @@ require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/init_function.php';
 require_once __DIR__ . '/functions/helper_function.php';
 //認証
+require_once __DIR__ . '/functions/cookie_function.php'; // 追加
 require_once __DIR__ . '/functions/auth_function.php';
 check_authentication();
 

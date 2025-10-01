@@ -1,13 +1,16 @@
 <?php
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/helper_function.php';
+require_once __DIR__ . '/functions/cookie_function.php'; // 追加
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
 // 認証情報の検証
 if (!file_exists(AUTH_CONFIG_PATH)) { redirect('setting.php'); }
-if (isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true) {
+// クッキー認証済みチェックに置き換え
+if (validate_auth_cookie()) {
     redirect('index.php');
 }
 
@@ -23,7 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $config = require AUTH_CONFIG_PATH;
         if ($user_input === $config['user'] && password_verify($password_input, $config['hash'])) {
-            $_SESSION['authenticated'] = true;
+            // 認証成功: クッキーの発行に置き換え
+            issue_auth_cookie($user_input); // 修正
             redirect('index.php');
         } else {
             $error_message = 'メールアドレスまたはパスワードが間違っています。';

@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/helper_function.php';
+require_once __DIR__ . '/functions/cookie_function.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -49,9 +51,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $accept_config_content = json_encode([
                 'allowed_extensions' => [
                     'pdf',
-                    'txt','csv','md',
-                    'jpg','jpeg','png','gif','svg','webp',
-                    'mp3','mp4',
+                    'txt',
+                    'csv',
+                    'md',
+                    'jpg',
+                    'jpeg',
+                    'png',
+                    'gif',
+                    'svg',
+                    'webp',
+                    'mp3',
+                    'mp4',
                     'zip',
                 ],
                 'max_file_size_mb' => 150
@@ -94,9 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error_messages[] = '認証設定ファイル(auth.php)の作成に失敗しました。';
             }
         }
-        // 全ての処理が成功 > セッションを保持してリダイレクト
+        // クッキー認証キーの生成と保存 (config/cookie_key.php)
+        if (empty($error_messages) && !file_exists(COOKIE_KEY_PATH)) {
+            if (empty(create_and_save_cookie_key())) {
+                $error_messages[] = 'クッキー認証キーの作成に失敗しました。';
+            }
+        }
+        // 全ての処理が成功 > クッキーを発行してリダイレクト
         if (empty($error_messages)) {
-            $_SESSION['authenticated'] = true;
+            issue_auth_cookie($user);
             redirect('index.php');
         }
     }
