@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/helper_function.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // 認証情報の検証
 if (!file_exists(AUTH_CONFIG_PATH)) { redirect('setting.php'); }

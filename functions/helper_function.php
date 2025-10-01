@@ -1,7 +1,7 @@
 <?php
 // custom_functions.php
 // ヘルパー関数群
-require_once __DIR__ . '/init_function.php';
+//require_once __DIR__ . '/init_function.php';
 
 
 // ランダムな15桁 -data-[15桁]でルートフォルダ名を作成

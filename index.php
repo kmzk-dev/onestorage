@@ -2,6 +2,10 @@
 // 開発用
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
+// セッション
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 //初期設定
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/init_function.php';
@@ -64,7 +68,7 @@ $json_message = json_encode($message);
                     <ul class="nav flex-column px-3">
                         <li class="nav-item">
                             <a class="nav-link <?= (empty($web_path)) ? 'active' : '' ?>" href="?path=">
-                                <i class="bi bi-house-door me-2"></i>ルート
+                                <i class="bi bi-house-door me-2"></i>home
                             </a>
                         </li>
                     </ul>
@@ -110,7 +114,7 @@ $json_message = json_encode($message);
                     <div id="breadcrumbContainer" class="flex-grow-1">
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb">
-                                <li class="breadcrumb-item"><a href="?path=" class="text-dark text-decoration-none">ルート</a></li>
+                                <li class="breadcrumb-item"><a href="?path=" class="text-dark text-decoration-none">home</a></li>
                                 <?php foreach ($breadcrumbs as $crumb): ?>
                                     <li class="breadcrumb-item">
                                         <a href="?path=<?= urlencode($crumb['path']) ?>" class="text-dark text-decoration-none">

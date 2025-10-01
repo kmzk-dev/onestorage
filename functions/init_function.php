@@ -2,18 +2,17 @@
 // init.php
 // アプリケーションの動作に必要な設定をロードし、定数・変数を定義する。
 require_once __DIR__ . '/../path.php';
+require_once __DIR__ . '/helper_function.php';
 
-// セッション
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
 // DATA_ROOT
 if (!file_exists(MAIN_CONFIG_PATH)) { 
-    die('データフォルダの設定ファイル(config.php)が見つかりません。'); 
+    //die('データフォルダの設定ファイル(config.php)が見つかりません。');
+    redirect('setting.php');
 }
 $main_config = require MAIN_CONFIG_PATH;
 if (!isset($main_config['data_root'])) {
-    die('設定ファイル(config.php)に必須の\'data_root\'が定義されていません。');
+    //die('設定ファイル(config.php)に必須の\'data_root\'が定義されていません。');
+    redirect('setting.php');
 }
 define('DATA_ROOT', $main_config['data_root']);
 
