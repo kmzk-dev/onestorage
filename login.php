@@ -8,8 +8,8 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // 認証情報の検証
-if (!file_exists(AUTH_CONFIG_PATH) || !file_exists(MFA_SECRET_PATH)) { 
-    redirect('setting.php'); 
+if (!file_exists(AUTH_CONFIG_PATH) || !file_exists(MFA_SECRET_PATH)) {
+    redirect('setting.php');
 }
 if (validate_auth_cookie()) {
     redirect('index.php');
@@ -41,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -49,37 +50,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <style>
     </style>
 </head>
+
 <body class="bg-light">
-    
+
     <div class="container my-5">
-    <div class="row justify-content-center">
-    <div class="col-lg-5 col-md-7 col-sm-9"> 
-    <div class="p-4 border rounded-3 bg-white shadow-sm">
-    
-        <h2 class="mb-4 text-center">ログイン</h2>
-        
-        <?php if ($error_message): ?>
-            <div class="alert alert-danger" role="alert">
-                <?php echo htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8'); ?>
+        <div class="row justify-content-center">
+            <div class="col-lg-5 col-md-7 col-sm-9">
+                <div class="p-4 border rounded-3 bg-white shadow-sm">
+                    <div class="col-4 mx-auto mb-3">
+                        <img class="img-fluid" src="img/Gemini_Generated_Image_dpkroidpkroidpkr.png" alt="">
+                    </div>
+                    <p class="text-center text-muted h6 ">ユーザーログイン</p>
+                    <?php if ($error_message): ?>
+                        <div class="alert alert-danger" role="alert">
+                            <?php echo htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8'); ?>
+                        </div>
+                    <?php endif; ?>
+
+                    <form action="login.php" method="POST">
+                        <div class="py-3">
+                            <div class="form-floating mb-3">
+                                <input type="email" class="form-control" name="user" id="floatingInput" placeholder="name@example.com" required>
+                                <label for="floatingInput">メールアドレス</label>
+                            </div>
+                            <div class="form-floating">
+                                <input type="password" class="form-control" name="password" id="floatingPassword" placeholder="Password">
+                                <label for="floatingPassword">パスワード</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">ログイン</button>
+                    </form>
+                    <div>
+                        <p class="text-muted pt-3">
+                            <sapn class="fw-bold">パスワードを忘れた場合</sapn></br>
+                            契約しているサーバーからauth.phpだけを削除してください。</br>
+                            ストレージを維持したまま、安全に再設定することができます。
+                        </p>
+                    </div>
+
+                </div>
             </div>
-        <?php endif; ?>
-        
-        <form action="login.php" method="POST">
-            <div class="mb-3">
-                <label for="user" class="form-label">メールアドレス:</label> 
-                <input type="text" id="user" name="user" class="form-control" required>
-            </div>
-            <div class="mb-4">
-                <label for="password" class="form-label">パスワード:</label>
-                <input type="password" id="password" name="password" class="form-control" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">ログイン</button>
-        </form>
-        
-    </div>
-    </div>
-    </div>
+        </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

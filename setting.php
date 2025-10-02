@@ -83,9 +83,16 @@ if ($setup_status['account']) {
 
 // 許可する拡張子の初期リスト
 $default_extensions = [
-    'pdf', 'txt', 'csv', 'md', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp3', 'mp4', 'zip', 'xls', 'xlsx', 'doc', 'docx', 'pptx', 'heic'
+    'pdf', 'txt', 'csv', 'md', 
+    'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a',
+    'mp4', 'mov', 'avi', 'mkv', 'webm',
+    'zip', '7z', 'rar',
+    'xls', 'xlsx', 'doc', 'docx', 'pptx', 'heic',
+    'json', 'yml', 'yaml', 'ini', 'log',
+    'ai', 'psd',
 ];
-$default_max_size = 500;
+$default_max_size = 750;
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -115,15 +122,15 @@ $default_max_size = 500;
                     </div>
                     <p class="text-center text-muted">あなただけのストレージサービスで</br>プライバシーを守りましょう</p>
 
-                    <div class="mb-3 p-2">
-                        <span class="mb-3"><i class="fa-solid fa-clipboard-list me-2"></i>設定の進捗</span>
+                    <div class="p-2">
+                        <span class="mb-3"><i class="fa-solid fa-clipboard-list me-2"></i>本サービスはMFAが必須です。</br>設定を始める前にGoogleAuthenticator等のTOTP方式の認証アプリをご自身のスマートフォンにインストールしてください。</span>
                         <hr>
                         <div class="py-2 px-3 bg-light">
                             <ul class="list-unstyled setup-status-list">
                                 <li class="mb-2"><span id="statusStorageData" class="status-icon me-2"></span> ストレージフォルダ/基本設定ファイル作成</li>
                                 <li class="mb-2"><span id="statusStorageAccept" class="status-icon me-2"></span> 利用できる拡張子の設定</li>
-                                <li class="mb-2"><span id="statusAccount" class="status-icon me-2"></span> アカウント登録</li>
-                                <li class="mb-2"><span id="statusMfa" class="status-icon me-2"></span> 二段階認証（MFA）キー登録</li>
+                                <li class="mb-2"><span id="statusAccount" class="status-icon me-2"></span> ユーザーアカウント登録</li>
+                                <li class="mb-2"><span id="statusMfa" class="status-icon me-2"></span> 二段階認証:MFAの登録</li>
                             </ul>
                         </div>
                     </div>
@@ -131,7 +138,7 @@ $default_max_size = 500;
                     <div id="setupStepsContainer">
                         <div id="stepStorageData" class="setting-step">
                             <p class="text-muted fw-bold">STEP1: システムが動作するための設定を行います</p>
-                            <button id="btnCreateStorageData" class="btn btn-primary">ストレージを開設</button>
+                            <button id="btnCreateStorageData" class="btn btn-primary">設定を開始する</button>
                         </div>
                         <div id="stepStorageAccept" class="setting-step">
                             <p class="text-muted">STEP2: アップロードを許可するファイル拡張子を選択してください</p>
@@ -142,8 +149,8 @@ $default_max_size = 500;
                             <button id="btnOpenAccountModal" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#accountModal">アカウントを登録</button>
                         </div>
                         <div id="stepMfa" class="setting-step">
-                            <h4 class="mb-3">STEP4: 二段階認証（MFA）の登録</h4>
-                            <p class="text-muted">Google Authenticatorを使ってあなたのデータを保護してください</p>
+                            <h4 class="mb-3">STEP4: 二段階認証:MFAの登録</h4>
+                            <p class="text-muted">GoogleAuthenticator等のTOTPに対応している認証アプリを使ってアカウントを保護してください</p>
                             <button id="btnOpenMfaModal" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mfaModal">MFAキーを生成・表示</button>
                         </div>
                         <div id="stepComplete" class="setting-step text-center">
@@ -160,8 +167,8 @@ $default_max_size = 500;
     <div class="modal fade" id="acceptModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">利用できる拡張子の設定</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-dark text-light">
+                    <h5 class="modal-title">利用できる拡張子の設定</h5>
                 </div>
                 <form id="formAcceptExtensions">
                     <div class="modal-body">
@@ -185,7 +192,7 @@ $default_max_size = 500;
                             <?php endforeach; ?>
                         </div>
                     </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button><button type="submit" class="btn btn-primary" id="btnSaveAccept">設定を保存</button></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button><button type="submit" class="btn btn-primary" id="btnSaveAccept">設定する</button></div>
                 </form>
             </div>
         </div>
@@ -194,8 +201,8 @@ $default_max_size = 500;
     <div class="modal fade" id="accountModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">管理者アカウント登録</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-dark text-light">
+                    <h5 class="modal-title">ユーザーアカウント登録</h5>
                 </div>
                 <form id="formRegisterAccount">
                     <div class="modal-body">
@@ -209,7 +216,7 @@ $default_max_size = 500;
                             <div class="form-text">大文字/小文字/数字を含む15桁以上で設定してください。</div>
                         </div>
                     </div>
-                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button><button type="submit" class="btn btn-primary" id="btnRegisterAccount">アカウントを登録</button></div>
+                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button><button type="submit" class="btn btn-primary" id="btnRegisterAccount">登録する</button></div>
                 </form>
             </div>
         </div>
@@ -218,14 +225,14 @@ $default_max_size = 500;
     <div class="modal fade" id="mfaModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">二段階認証（MFA）キー登録</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <div class="modal-header bg-dark text-light">
+                    <h5 class="modal-title">二段階認証:MFAの登録</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body text-center">
                     <p class="text-muted">Google Authenticatorアプリで以下のQRコードをスキャンするか、セットアップコードを手動入力してください。</p>
                     
                     <div id="mfaQrcodeContainer" class="mb-3">
-                         <img id="mfaQrcodeImage" src="" alt="MFA QR Code" class="img-fluid border p-2" style="width: 200px; height: 200px;">
+                        <img id="mfaQrcodeImage" src="" alt="MFA QR Code" class="img-fluid border p-2" style="width: 200px; height: 200px;">
                     </div>
                     
                     <h6 class="mt-4">セットアップコード:</h6>
@@ -242,7 +249,7 @@ $default_max_size = 500;
                     </ol>
 
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-success w-100" data-bs-dismiss="modal" id="btnMfaNext">MFA登録を完了し、次へ</button></div>
+                <div class="modal-footer"><button type="button" class="btn btn-success w-100" data-bs-dismiss="modal" id="btnMfaNext">MFA登録を完了</button></div>
             </div>
         </div>
     </div>
