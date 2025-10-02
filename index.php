@@ -64,7 +64,7 @@ $json_message = json_encode($message);
     <?php require_once __DIR__ . '/templates/nav.php'; ?>
     <div class="container-fluid">
         <div class="row">
-            <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-ligth sidebar collapse">
+            <nav id="sidebarMenu" class="col-md-4 col-lg-3 d-md-block bg-ligth sidebar collapse">
                 <div class="sidebar-sticky pt-3">
                     <ul class="nav flex-column px-3">
                         <li class="nav-item">
@@ -110,7 +110,7 @@ $json_message = json_encode($message);
                 </div>
             </nav>
 
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+            <main class="col-md-8 ms-sm-auto col-lg-9 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <div id="breadcrumbContainer" class="flex-grow-1">
                         <nav aria-label="breadcrumb">
