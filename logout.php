@@ -9,6 +9,9 @@ clear_auth_cookie(); // 修正
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+// 1段階目認証セッションも破棄
+unset($_SESSION['auth_passed']); 
+
 $_SESSION = [];
 session_destroy();
 

@@ -59,6 +59,8 @@ function issue_auth_cookie(string $user): void {
     $cookie_value = base64_encode(json_encode(['user' => $user, 'token' => $token]));
     
     $expiry = time() + (86400 * AUTH_COOKIE_EXPIRY_DAYS); // 86400秒 = 1日
+
+    $is_secure = is_https();
     
     // クッキーを発行 (HTTP Only, SameSite=Laxを設定)
     // 開発環境を考慮し、Secureはfalseとしていますが、本番環境ではtrueを推奨します。
@@ -66,7 +68,7 @@ function issue_auth_cookie(string $user): void {
         'expires' => $expiry,
         'path' => '/',
         'domain' => '', 
-        'secure' => false, 
+        'secure' => $is_secure, 
         'httponly' => true,
         'samesite' => 'Lax'
     ]);

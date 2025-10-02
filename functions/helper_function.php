@@ -179,3 +179,22 @@ function cleanup_stale_chunks(): int {
     }
     return $deleted_count;
 }
+
+/**
+ * 現在の接続がHTTPSかどうかを判定する
+ * @return bool HTTPSならtrue
+ */
+function is_https(): bool {
+    // サーバー変数に基づく標準的なチェック
+    if (isset($_SERVER['HTTPS']) && ($_SERVER['HTTPS'] === 'on' || $_SERVER['HTTPS'] === 1)) {
+        return true;
+    }
+    if (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443) {
+        return true;
+    }
+    // ロードバランサやプロキシ経由の場合のチェック
+    if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https') {
+        return true;
+    }
+    return false;
+}
