@@ -50,7 +50,7 @@ if ($is_star_view) {
         if ($full_path !== false && strpos($full_path, DATA_ROOT) === 0) {
             // 存在チェックOK。サイズは再計算する方が安全
             $is_dir = is_dir($full_path);
-            $size = $is_dir ? get_directory_size($full_path) : filesize($full_path);
+            $size = $is_dir ? null : filesize($full_path);
 
             $items[] = [
                 'name' => $star_item['name'],
@@ -125,7 +125,7 @@ if ($is_star_view) {
         if (str_starts_with($item, '.')) continue;
         $item_path = $current_path . '/' . $item;
         $is_dir = is_dir($item_path);
-        $size = $is_dir ? get_directory_size($item_path) : filesize($item_path);
+        $size = $is_dir ? null : filesize($item_path);
 
         $item_hash = get_item_hash($web_path, $item);
 
