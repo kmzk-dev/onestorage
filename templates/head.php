@@ -22,5 +22,16 @@
         
         .file-list .file-row:hover { background-color: #f8f9fa; }
         .file-list a { text-decoration: none; color: inherit; }
+        /* ★スターボタンのスタイル */
+        .file-row .star-toggle-btn {
+            border: none;
+            background-color: transparent;
+            padding: 0 5px;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .file-row .star-toggle-btn:hover {
+            opacity: 0.7;
+        }
     </style>
 </head>

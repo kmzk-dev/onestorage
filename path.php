@@ -7,3 +7,5 @@ define('COOKIE_KEY_PATH', __DIR__ . '/config/cookie_key.php');
 define('MFA_SECRET_PATH', __DIR__ . '/config/mfa_secret.php');
 
 define('DIR_CACHE_PATH', '.dir_cache.json');
+define('STAR_CONFIG_FILENAME', '.star.json');
+

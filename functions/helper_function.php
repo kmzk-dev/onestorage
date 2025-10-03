@@ -198,3 +198,113 @@ function is_https(): bool {
     }
     return false;
 }
+
+
+/**
+ * スター設定ファイルパスを取得する
+ * DATA_ROOTが定義されていることが前提
+ * @return string スター設定ファイルパス
+ */
+function get_star_config_path(): string {
+    if (!defined('DATA_ROOT') || !defined('STAR_CONFIG_FILENAME')) {
+        error_log('DATA_ROOT or STAR_CONFIG_FILENAME is not defined.');
+        return '';
+    }
+    return DATA_ROOT . DIRECTORY_SEPARATOR . STAR_CONFIG_FILENAME;
+}
+
+/**
+ * スター設定ファイルを読み込む
+ * @return array スター登録されたアイテムのリスト
+ */
+function load_star_config(): array {
+    $path = get_star_config_path();
+    if (empty($path) || !file_exists($path)) {
+        return [];
+    }
+    $content = file_get_contents($path);
+    $data = json_decode($content, true);
+    return is_array($data) ? $data : [];
+}
+
+/**
+ * スター設定ファイルを保存する
+ * @param array $data スター登録されたアイテムのリスト
+ * @return bool 成功ならtrue
+ */
+function save_star_config(array $data): bool {
+    $path = get_star_config_path();
+    if (empty($path)) return false;
+    
+    // itemsをソートする
+    usort($data, fn($a, $b) => strcmp($a['path'] . $a['name'], $b['path'] . $b['name']));
+    
+    $content = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    return file_put_contents($path, $content) !== false;
+}
+
+/**
+ * スターアイテムのパス（web_path + item_name）のハッシュを取得
+ * @param string $web_path アイテムがあるディレクトリのウェブパス
+ * @param string $item_name アイテム名
+ * @return string ハッシュキー
+ */
+function get_item_hash(string $web_path, string $item_name): string {
+    $full_path = ltrim($web_path . '/' . $item_name, '/');
+    return md5($full_path);
+}
+
+/**
+ * スターアイテムの登録/解除を行う
+ * @param string $web_path アイテムがあるディレクトリのウェブパス
+ * @param string $item_name アイテム名
+ * @param bool $is_dir ディレクトリかファイルか
+ * @return array 成功フラグ、アクション（added/removed）、メッセージ
+ */
+function toggle_star_item(string $web_path, string $item_name, bool $is_dir): array {
+    global $DATA_ROOT; // DATA_ROOTが定義されていることを期待
+    
+    $current_stars = load_star_config();
+    $item_hash = get_item_hash($web_path, $item_name);
+    $is_starred = false;
+    
+    // アイテムの存在チェックと容量取得
+    $full_path = realpath(DATA_ROOT . '/' . ltrim($web_path . '/' . $item_name, '/'));
+    if ($full_path === false || strpos($full_path, DATA_ROOT) !== 0 || str_starts_with($item_name, '.')) {
+        return ['success' => false, 'message' => '無効なアイテムです。'];
+    }
+    
+    $size = $is_dir ? get_directory_size($full_path) : filesize($full_path);
+
+    // ハッシュに基づいてアイテムを検索し、存在する場合は削除
+    $new_stars = [];
+    foreach ($current_stars as $star) {
+        if (get_item_hash($star['path'], $star['name']) !== $item_hash) {
+            $new_stars[] = $star;
+        } else {
+            $is_starred = true;
+        }
+    }
+
+    if ($is_starred) {
+        // 解除
+        if (save_star_config($new_stars)) {
+            return ['success' => true, 'action' => 'removed', 'message' => htmlspecialchars($item_name, ENT_QUOTES, 'UTF-8') . ' のスターを解除しました。'];
+        }
+    } else {
+        // 登録
+        $new_item = [
+            'hash' => $item_hash,
+            'path' => $web_path,
+            'name' => $item_name,
+            'is_dir' => $is_dir,
+            'size' => $size,
+        ];
+        $new_stars[] = $new_item;
+        if (save_star_config($new_stars)) {
+            return ['success' => true, 'action' => 'added', 'message' => htmlspecialchars($item_name, ENT_QUOTES, 'UTF-8') . ' をスターに登録しました。'];
+        }
+    }
+    
+    return ['success' => false, 'message' => 'スター設定の保存に失敗しました。'];
+}

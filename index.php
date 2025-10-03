@@ -20,32 +20,89 @@ require_once __DIR__ . '/functions/post_request_function.php';
 
 // --- 画面 ---
 $current_path_raw = $_GET['path'] ?? '';
-$current_path = realpath(DATA_ROOT . '/' . $current_path_raw);
-if ($current_path === false || strpos($current_path, DATA_ROOT) !== 0) $current_path = DATA_ROOT;
-$web_path = ltrim(substr($current_path, strlen(DATA_ROOT)), '/');
-$web_path = str_replace('\\', '/', $web_path);
-$items = [];
-$all_items = array_diff(scandir($current_path), ['.', '..']);
-natsort($all_items);
+// ★スターカテゴリの判定
+$is_star_view = ($current_path_raw === 'starred');
 
-foreach ($all_items as $item) {
-    if (str_starts_with($item, '.')) continue;
-    $item_path = $current_path . '/' . $item;
-    $is_dir = is_dir($item_path);
-    $size = $is_dir ? get_directory_size($item_path) : filesize($item_path);
-    $items[] = [
-        'name' => $item,
-        'is_dir' => $is_dir,
-        'size' => $size,
-        'formatted_size' => format_bytes($size)
-    ];
+if ($is_star_view) {
+    $current_path = ''; // 疑似的なパス
+    $web_path = ''; // 疑似的なウェブパス
+    $items = [];
+    $all_starred_items = load_star_config();
+
+    // アイテムのメタデータを更新・検証しながらリストを作成
+    foreach ($all_starred_items as $star_item) {
+        $item_path_from_root = ltrim($star_item['path'] . '/' . $star_item['name'], '/');
+        $full_path = realpath(DATA_ROOT . '/' . $item_path_from_root);
+
+        if ($full_path !== false && strpos($full_path, DATA_ROOT) === 0) {
+            // 存在チェックOK。サイズは再計算する方が安全
+            $is_dir = is_dir($full_path);
+            $size = $is_dir ? get_directory_size($full_path) : filesize($full_path);
+
+            $items[] = [
+                'name' => $star_item['name'],
+                'path' => $star_item['path'],
+                'is_dir' => $is_dir,
+                'size' => $size,
+                'formatted_size' => format_bytes($size),
+                'is_starred' => true
+            ];
+        } else {
+            // ファイルが存在しない場合は表示しない
+        }
+    }
+} else {
+    // 通常のフォルダ表示の場合
+    $current_path = realpath(DATA_ROOT . '/' . $current_path_raw);
+    if ($current_path === false || strpos($current_path, DATA_ROOT) !== 0) $current_path = DATA_ROOT;
+    $web_path = ltrim(substr($current_path, strlen(DATA_ROOT)), '/');
+    $web_path = str_replace('\\', '/', $web_path);
+    $items = [];
+    $all_items = array_diff(scandir($current_path), ['.', '..']);
+    natsort($all_items);
+
+    $starred_items = load_star_config();
+    $starred_hashes = [];
+    foreach ($starred_items as $star) {
+        // パフォーマンスのため、現在のディレクトリにあるアイテムのハッシュのみをチェック
+        if ($star['path'] === $web_path) {
+            $starred_hashes[get_item_hash($star['path'], $star['name'])] = true;
+        }
+    }
+
+    foreach ($all_items as $item) {
+        if (str_starts_with($item, '.')) continue;
+        $item_path = $current_path . '/' . $item;
+        $is_dir = is_dir($item_path);
+        $size = $is_dir ? get_directory_size($item_path) : filesize($item_path);
+
+        $item_hash = get_item_hash($web_path, $item);
+
+        $items[] = [
+            'name' => $item,
+            'is_dir' => $is_dir,
+            'size' => $size,
+            'formatted_size' => format_bytes($size),
+            'is_starred' => isset($starred_hashes[$item_hash]), // ★スター状態を設定
+            'path' => $web_path,
+        ];
+    }
 }
-usort($items, fn($a, $b) => ($a['is_dir'] !== $b['is_dir']) ? ($a['is_dir'] ? -1 : 1) : strcasecmp($a['name'], $b['name']));
+
+// フォルダ表示の場合のみソート（スター表示の場合は既にロード時にソート済み）
+if (!$is_star_view) {
+    usort($items, fn($a, $b) => ($a['is_dir'] !== $b['is_dir']) ? ($a['is_dir'] ? -1 : 1) : strcasecmp($a['name'], $b['name']));
+}
+
 $dir_cache = load_dir_cache();
 $sidebar_folders = $dir_cache['tree'];
 $all_dirs = $dir_cache['list'];
 $breadcrumbs = [];
-if (!empty($web_path)) {
+
+if ($is_star_view) {
+    // ★スター表示のパンくずリスト
+    $breadcrumbs[] = ['name' => 'Starred Items', 'path' => 'starred'];
+} elseif (!empty($web_path)) {
     $tmp_path = '';
     foreach (explode('/', $web_path) as $part) {
         $tmp_path .= (empty($tmp_path) ? '' : '/') . $part;
@@ -55,6 +112,10 @@ if (!empty($web_path)) {
 $message = $_SESSION['message'] ?? null;
 unset($_SESSION['message']);
 $json_message = json_encode($message);
+
+// ★スターカテゴリ専用の変数
+$STAR_API_URL = 'functions/star_api_function.php';
+$json_star_view = json_encode($is_star_view);
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -65,15 +126,22 @@ $json_message = json_encode($message);
     <div class="container-fluid">
         <div class="row">
             <nav id="sidebarMenu" class="col-md-4 col-lg-3 d-md-block bg-ligth sidebar collapse">
-                <div class="sidebar-sticky pt-3">
+                <div class="pt-3">
                     <ul class="nav flex-column px-3">
                         <li class="nav-item">
-                            <a class="nav-link <?= (empty($web_path)) ? 'active' : '' ?>" href="?path=">
+                            <a class="nav-link <?= $is_star_view ? 'active' : '' ?>" href="?path=starred">
+                                <i class="bi bi-star-fill me-2" style="color: gold;"></i>Starred Items
+                            </a>
+                        </li>
+                        <hr>
+                        <li class="nav-item mb-3">
+                            <a class="nav-link px-3 <?= (empty($web_path) && !$is_star_view) ? 'active' : '' ?>" href="?path=">
                                 <i class="bi bi-house-door me-2"></i>home
                             </a>
                         </li>
                     </ul>
-                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase"><span>フォルダ</span></h6>
+                </div>
+                <div class="sidebar-sticky pt-3" style="height: calc(100vh - 120px);">
                     <ul class="nav flex-column mb-2">
                         <?php
                         function render_folder_tree($folders, $current_path, $level = 0)
@@ -118,9 +186,15 @@ $json_message = json_encode($message);
                                 <li class="breadcrumb-item"><a href="?path=" class="text-dark text-decoration-none">home</a></li>
                                 <?php foreach ($breadcrumbs as $crumb): ?>
                                     <li class="breadcrumb-item">
-                                        <a href="?path=<?= urlencode($crumb['path']) ?>" class="text-dark text-decoration-none">
-                                            <?= htmlspecialchars($crumb['name'], ENT_QUOTES, 'UTF-8') ?>
-                                        </a>
+                                        <?php if ($crumb['name'] === 'Starred Items'): ?>
+                                            <a href="?path=starred" class="text-dark text-decoration-none">
+                                                <i class="bi bi-star-fill me-1 text-warning"></i><?= htmlspecialchars($crumb['name'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                        <?php else: ?>
+                                            <a href="?path=<?= urlencode($crumb['path']) ?>" class="text-dark text-decoration-none">
+                                                <?= htmlspecialchars($crumb['name'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                        <?php endif; ?>
                                     </li>
                                 <?php endforeach; ?>
                             </ol>
@@ -128,12 +202,15 @@ $json_message = json_encode($message);
                     </div>
                     <div id="tableActionsContainer" class="d-none">
                         <span class="text-muted me-3"><strong id="selectionCount">0</strong>個選択中</span>
-                        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#moveItemsModal"><i class="bi bi-folder-symlink"></i> 選択項目を移動</button>
+                        <?php if (!$is_star_view): ?>
+                            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#moveItemsModal"><i class="bi bi-folder-symlink"></i> 選択項目を移動</button>
+                        <?php endif; ?>
                     </div>
                 </div>
 
                 <div class="file-list">
                     <div class="row gx-2 text-muted border-bottom py-2 d-none d-md-flex small">
+                        <div class="col-auto" style="width: 30px;"></div>
                         <div class="col-auto">
                             <input class="form-check-input" type="checkbox" id="selectAllCheckbox">
                         </div>
@@ -145,21 +222,41 @@ $json_message = json_encode($message);
                     <?php if (empty($items)): ?>
                         <div class="text-center text-muted py-5">ファイルがありません</div>
                     <?php else: ?>
-                        <?php foreach ($items as $item): ?>
+                        <?php foreach ($items as $item):
+                            // ★スタービューでは元のパスを使用し、通常ビューでは現在のパスを使用
+                            $item_web_path_for_action = $item['path'] ?? $web_path;
+                            $item_full_web_path = ltrim($item_web_path_for_action . '/' . $item['name'], '/');
+                            $is_starred = $item['is_starred'] ?? false;
+                        ?>
                             <div class="row gx-2 d-flex align-items-center border-bottom file-row">
+                                <div class="col-auto py-2">
+                                    <button type="button" class="btn btn-sm btn-light star-toggle-btn"
+                                        data-web-path="<?= htmlspecialchars($item_web_path_for_action, ENT_QUOTES, 'UTF-8') ?>"
+                                        data-item-name="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-is-dir="<?= $item['is_dir'] ? '1' : '0' ?>"
+                                        title="<?= $is_starred ? 'スターを解除' : 'スターに登録' ?>">
+                                        <i class="bi bi-star<?= $is_starred ? '-fill text-warning' : ' text-muted' ?>"></i>
+                                    </button>
+                                </div>
                                 <div class="col-auto py-2">
                                     <input class="form-check-input item-checkbox" type="checkbox" value="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>">
                                 </div>
                                 <div class="col text-truncate py-2">
                                     <?php if ($item['is_dir']): ?>
-                                        <a href="?path=<?= urlencode(ltrim($web_path . '/' . $item['name'], '/')) ?>" class="d-flex align-items-center">
+                                        <a href="?path=<?= urlencode($is_star_view ? $item_web_path_for_action : ltrim($web_path . '/' . $item['name'], '/')) ?>" class="d-flex align-items-center">
                                             <i class="bi bi-folder-fill text-primary me-2 fs-5"></i>
                                             <span><?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php if ($is_star_view): ?>
+                                                <span class="ms-2 badge bg-secondary-subtle text-secondary fw-normal small">in: /<?= htmlspecialchars($item_web_path_for_action, ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php endif; ?>
                                         </a>
                                     <?php else: ?>
-                                        <a href="?action=view&path=<?= urlencode(ltrim($web_path . '/' . $item['name'], '/')) ?>" target="_blank" class="d-flex align-items-center">
+                                        <a href="?action=view&path=<?= urlencode($item_full_web_path) ?>" target="_blank" class="d-flex align-items-center">
                                             <i class="bi bi-file-earmark-text me-2 fs-5"></i>
                                             <span><?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php if ($is_star_view): ?>
+                                                <span class="ms-2 badge bg-secondary-subtle text-secondary fw-normal small">in: /<?= htmlspecialchars($item_web_path_for_action, ENT_QUOTES, 'UTF-8') ?></span>
+                                            <?php endif; ?>
                                         </a>
                                     <?php endif; ?>
                                 </div>
@@ -172,21 +269,34 @@ $json_message = json_encode($message);
                                             <i class="bi bi-three-dots-vertical"></i>
                                         </button>
                                         <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#renameItemModal" data-bs-item-name="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>" data-bs-is-dir="<?= $item['is_dir'] ? '1' : '0' ?>"><i class="bi bi-pencil-fill me-2"></i>名前の変更</button></li>
-                                            <?php if (!$item['is_dir']): ?>
-                                                <li><a class="dropdown-item" href="?action=download&path=<?= urlencode(ltrim($web_path . '/' . $item['name'], '/')) ?>"><i class="bi bi-download me-2"></i>ダウンロード</a></li>
+
+                                            <?php if (!$is_star_view): ?>
+                                                <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#renameItemModal" data-bs-item-name="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>" data-bs-is-dir="<?= $item['is_dir'] ? '1' : '0' ?>"><i class="bi bi-pencil-fill me-2"></i>名前の変更</button></li>
                                             <?php endif; ?>
-                                            <li>
-                                                <hr class="dropdown-divider">
-                                            </li>
-                                            <li>
-                                                <form action="index.php" method="post" onsubmit="return confirm('本当に「<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>」を削除しますか？\nこの操作は元に戻せません。');">
-                                                    <input type="hidden" name="action" value="delete_item">
-                                                    <input type="hidden" name="path" value="<?= htmlspecialchars($web_path, ENT_QUOTES, 'UTF-8') ?>">
-                                                    <input type="hidden" name="item_name" value="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>">
-                                                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash-fill me-2"></i>削除</button>
-                                                </form>
-                                            </li>
+
+                                            <li><a class="dropdown-item" href="?action=download&path=<?= urlencode($item_full_web_path) ?>"><i class="bi bi-download me-2"></i>ダウンロード</a></li>
+
+                                            <?php if ($is_star_view): ?>
+                                                <li>
+                                                    <hr class="dropdown-divider">
+                                                </li>
+                                                <li><a class="dropdown-item" href="?path=<?= urlencode($item_web_path_for_action) ?>"><i class="bi bi-arrow-return-right me-2"></i>元のフォルダへ</a></li>
+                                            <?php endif; ?>
+
+                                            <?php if (!$is_star_view): ?>
+                                                <li>
+                                                    <hr class="dropdown-divider">
+                                                </li>
+                                                <li>
+                                                    <form action="index.php" method="post" onsubmit="return confirm('本当に「<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>」を削除しますか？\nこの操作は元に戻せません。');">
+                                                        <input type="hidden" name="action" value="delete_item">
+                                                        <input type="hidden" name="path" value="<?= htmlspecialchars($item_web_path_for_action, ENT_QUOTES, 'UTF-8') ?>">
+                                                        <input type="hidden" name="item_name" value="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash-fill me-2"></i>削除</button>
+                                                    </form>
+                                                </li>
+                                            <?php endif; ?>
+
                                         </ul>
                                     </div>
                                 </div>
@@ -211,6 +321,9 @@ $json_message = json_encode($message);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const phpMessage = <?= $json_message ?>;
+        // ★スター機能の追加
+        const STAR_API_URL = '<?= $STAR_API_URL ?>';
+        const isStarView = <?= $json_star_view ?>;
 
         function showToast(type, message) {
             const toastContainer = document.querySelector('.toast-container');
@@ -295,148 +408,235 @@ $json_message = json_encode($message);
 
             adjustLayout();
             window.addEventListener('resize', adjustLayout);
-            
-        const uploadFileForm = document.getElementById('uploadFileForm');
-        if (uploadFileForm) {
-            const uploadModalEl = document.getElementById('uploadFileModal');
-            const uploadModal = new bootstrap.Modal(uploadModalEl);
-            const submitBtn = document.getElementById('uploadSubmitBtn');
-            const filesInput = document.getElementById('files');
-            const progressContainer = document.getElementById('uploadProgressContainer');
-            const progressBar = document.getElementById('uploadProgressBar');
-            const uploadFileName = document.getElementById('uploadFileName');
-            const uploadStatusText = document.getElementById('uploadStatusText');
-            const closeBtnFooter = document.getElementById('uploadModalFooterCloseBtn');
 
-            let isUploading = false;
-            let uploadQueue = [];
+            const uploadFileForm = document.getElementById('uploadFileForm');
+            if (uploadFileForm) {
+                const uploadModalEl = document.getElementById('uploadFileModal');
+                const uploadModal = new bootstrap.Modal(uploadModalEl);
+                const submitBtn = document.getElementById('uploadSubmitBtn');
+                const filesInput = document.getElementById('files');
+                const progressContainer = document.getElementById('uploadProgressContainer');
+                const progressBar = document.getElementById('uploadProgressBar');
+                const uploadFileName = document.getElementById('uploadFileName');
+                const uploadStatusText = document.getElementById('uploadStatusText');
+                const closeBtnFooter = document.getElementById('uploadModalFooterCloseBtn');
 
-            uploadModalEl.addEventListener('hide.bs.modal', function (event) {
-                if (isUploading) {
-                    event.preventDefault();
-                    showToast('warning', 'アップロード処理が完了するまでモーダルを閉じることはできません。');
-                }
-            });
+                let isUploading = false;
+                let uploadQueue = [];
 
-            uploadFileForm.addEventListener('submit', function (e) {
-                e.preventDefault();
-                if (isUploading) return;
-                
-                if (filesInput.files.length === 0) {
-                    showToast('warning', 'ファイルが選択されていません。');
-                    return;
-                }
-                
-                uploadQueue = Array.from(filesInput.files);
-                processUploadQueue();
-            });
-            
-            async function processUploadQueue() {
-                if (uploadQueue.length === 0) {
-                    isUploading = false;
-                    showToast('success', 'すべてのファイルのアップロードが完了しました。');
-                     setTimeout(() => {
-                        location.reload();
-                    }, 800);
-                    return;
-                }
+                uploadModalEl.addEventListener('hide.bs.modal', function(event) {
+                    if (isUploading) {
+                        event.preventDefault();
+                        showToast('warning', 'アップロード処理が完了するまでモーダルを閉じることはできません。');
+                    }
+                });
 
-                isUploading = true;
-                setUploadUiState(true);
+                uploadFileForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    if (isUploading) return;
 
-                const file = uploadQueue.shift(); // キューの先頭からファイルを取得
-                
-                // .で始まるファイルのアップロードを禁止
-                if (file.name.startsWith('.')) {
-                    showToast('warning', `[${file.name}] はドットで始まるためスキップされました。`);
-                    processUploadQueue(); // 次のファイルへ
-                    return;
-                }
-                
-                await uploadFileInChunks(file);
-
-                processUploadQueue(); // 次のファイルの処理へ
-            }
-
-            async function uploadFileInChunks(file) {
-                const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
-                const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-                let chunkIndex = 0;
-                
-                updateProgress(0, file.name, `(1/${totalChunks})`);
-
-                for (chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-                    const start = chunkIndex * CHUNK_SIZE;
-                    const end = Math.min(start + CHUNK_SIZE, file.size);
-                    const chunk = file.slice(start, end);
-
-                    const formData = new FormData();
-                    formData.append('action', 'upload_chunk');
-                    formData.append('path', document.getElementById('upload_path').value);
-                    formData.append('chunk', chunk, file.name);
-                    formData.append('original_name', file.name);
-                    formData.append('chunk_index', chunkIndex);
-                    formData.append('total_chunks', totalChunks);
-                    formData.append('total_size', file.size);
-                    
-                    try {
-                        const response = await fetch('index.php', {
-                            method: 'POST',
-                            body: formData
-                        });
-
-                        if (!response.ok) {
-                            throw new Error('サーバーエラーが発生しました。');
-                        }
-
-                        const data = await response.json();
-                        
-                        if (data.type === 'danger' || data.type === 'warning') {
-                            throw new Error(data.text);
-                        }
-
-                        if (data.type === 'success') {
-                             updateProgress(100, file.name, '完了');
-                        } else {
-                            const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-                            updateProgress(progress, file.name, `(${chunkIndex + 2 > totalChunks ? totalChunks : chunkIndex + 2}/${totalChunks})`);
-                        }
-
-                    } catch (error) {
-                        showToast('danger', `[${file.name}] のアップロードに失敗しました: ${error.message}`);
-                        setUploadUiState(false);
-                        uploadQueue = []; // エラーが発生したらキューをクリア
+                    if (filesInput.files.length === 0) {
+                        showToast('warning', 'ファイルが選択されていません。');
                         return;
                     }
+
+                    uploadQueue = Array.from(filesInput.files);
+                    processUploadQueue();
+                });
+
+                async function processUploadQueue() {
+                    if (uploadQueue.length === 0) {
+                        isUploading = false;
+                        showToast('success', 'すべてのファイルのアップロードが完了しました。');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 800);
+                        return;
+                    }
+
+                    isUploading = true;
+                    setUploadUiState(true);
+
+                    const file = uploadQueue.shift(); // キューの先頭からファイルを取得
+
+                    // .で始まるファイルのアップロードを禁止
+                    if (file.name.startsWith('.')) {
+                        showToast('warning', `[${file.name}] はドットで始まるためスキップされました。`);
+                        processUploadQueue(); // 次のファイルへ
+                        return;
+                    }
+
+                    await uploadFileInChunks(file);
+
+                    processUploadQueue(); // 次のファイルの処理へ
+                }
+
+                async function uploadFileInChunks(file) {
+                    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB per chunk
+                    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                    let chunkIndex = 0;
+
+                    updateProgress(0, file.name, `(1/${totalChunks})`);
+
+                    for (chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                        const start = chunkIndex * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, file.size);
+                        const chunk = file.slice(start, end);
+
+                        const formData = new FormData();
+                        formData.append('action', 'upload_chunk');
+                        formData.append('path', document.getElementById('upload_path').value);
+                        formData.append('chunk', chunk, file.name);
+                        formData.append('original_name', file.name);
+                        formData.append('chunk_index', chunkIndex);
+                        formData.append('total_chunks', totalChunks);
+                        formData.append('total_size', file.size);
+
+                        try {
+                            const response = await fetch('index.php', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            if (!response.ok) {
+                                throw new Error('サーバーエラーが発生しました。');
+                            }
+
+                            const data = await response.json();
+
+                            if (data.type === 'danger' || data.type === 'warning') {
+                                throw new Error(data.text);
+                            }
+
+                            if (data.type === 'success') {
+                                updateProgress(100, file.name, '完了');
+                            } else {
+                                const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+                                updateProgress(progress, file.name, `(${chunkIndex + 2 > totalChunks ? totalChunks : chunkIndex + 2}/${totalChunks})`);
+                            }
+
+                        } catch (error) {
+                            showToast('danger', `[${file.name}] のアップロードに失敗しました: ${error.message}`);
+                            setUploadUiState(false);
+                            uploadQueue = []; // エラーが発生したらキューをクリア
+                            return;
+                        }
+                    }
+                }
+
+                function setUploadUiState(uploading) {
+                    isUploading = uploading;
+                    submitBtn.disabled = uploading;
+                    closeBtnFooter.disabled = uploading;
+                    filesInput.disabled = uploading;
+
+                    if (uploading) {
+                        progressContainer.classList.remove('d-none');
+                        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> アップロード中...`;
+                    } else {
+                        progressContainer.classList.add('d-none');
+                        submitBtn.innerHTML = 'アップロード';
+                        uploadFileForm.reset();
+                    }
+                }
+
+                function updateProgress(percentage, name, status) {
+                    uploadFileName.textContent = name;
+                    progressBar.style.width = percentage + '%';
+                    progressBar.setAttribute('aria-valuenow', percentage);
+                    progressBar.textContent = percentage + '%';
                 }
             }
-            
-            function setUploadUiState(uploading) {
-                isUploading = uploading;
-                submitBtn.disabled = uploading;
-                closeBtnFooter.disabled = uploading;
-                filesInput.disabled = uploading;
 
-                if (uploading) {
-                    progressContainer.classList.remove('d-none');
-                    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> アップロード中...`;
-                } else {
-                    progressContainer.classList.add('d-none');
-                    submitBtn.innerHTML = 'アップロード';
-                    uploadFileForm.reset();
-                }
+            // ★スター機能のトグル処理
+            const starToggleBtns = document.querySelectorAll('.star-toggle-btn');
+            starToggleBtns.forEach(button => {
+                button.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    const webPath = button.getAttribute('data-web-path');
+                    const itemName = button.getAttribute('data-item-name');
+                    const isDir = button.getAttribute('data-is-dir') === '1';
+                    const icon = button.querySelector('i');
+
+                    // ロード状態を一時的に設定
+                    const originalIconClass = icon.className;
+                    const originalTitle = button.title;
+                    icon.className = 'bi bi-arrow-repeat spin-animation text-info';
+                    button.disabled = true;
+
+                    try {
+                        const response = await fetch(STAR_API_URL, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                action: 'toggle_star',
+                                data: {
+                                    web_path: webPath,
+                                    item_name: itemName,
+                                    is_dir: isDir
+                                }
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            showToast('success', data.message);
+
+                            // UIを更新
+                            if (data.action === 'added') {
+                                icon.className = 'bi bi-star-fill text-warning';
+                                button.title = 'スターを解除';
+                            } else if (data.action === 'removed') {
+                                icon.className = 'bi bi-star text-muted';
+                                button.title = 'スターに登録';
+
+                                // スタービューの場合はアイテムをリストから削除し、ページをリロードしてリストを更新
+                                if (isStarView) {
+                                    // 最も近い file-row を削除
+                                    const row = button.closest('.file-row');
+                                    if (row) {
+                                        row.remove();
+                                    }
+                                    // すべて削除されたら再ロード
+                                    if (document.querySelectorAll('.file-row').length === 0) {
+                                        location.reload();
+                                    }
+                                }
+                            }
+                        } else {
+                            showToast('danger', data.message);
+                            icon.className = originalIconClass; // エラー時は元に戻す
+                            button.title = originalTitle;
+                        }
+                    } catch (error) {
+                        showToast('danger', `スター操作中にエラーが発生しました: ${error.message}`);
+                        icon.className = originalIconClass; // エラー時は元に戻す
+                        button.title = originalTitle;
+                    } finally {
+                        button.disabled = false;
+                        // スピンアニメーション用のクラスを削除するために再設定
+                        if (icon.className.includes('spin-animation')) {
+                            icon.className = icon.className.replace(' spin-animation', '');
+                        }
+                    }
+                });
+            });
+
+            // スピンアニメーションのCSSをインラインで追加
+            const style = document.createElement('style');
+            style.textContent = `
+            .spin-animation {
+                animation: spin 1s linear infinite;
             }
-
-            function updateProgress(percentage, name, status) {
-                uploadFileName.textContent = name;
-                progressBar.style.width = percentage + '%';
-                progressBar.setAttribute('aria-valuenow', percentage);
-                progressBar.textContent = percentage + '%';
+            @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
             }
-        }
-
-
-
+        `;
+            document.head.appendChild(style);
 
 
             const selectAllCheckbox = document.getElementById('selectAllCheckbox');
