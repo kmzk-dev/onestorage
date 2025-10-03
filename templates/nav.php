@@ -8,11 +8,20 @@
 </button>
     <div class="navbar-nav">
         <div class="nav-item text-nowrap d-flex align-items-center">
-        <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#createFolderModal" title="フォルダ作成">
+        <?php 
+            // フォルダ作成はINBOXとルート以外で許可
+            $create_folder_disabled = ($is_inbox_view || $is_star_view) ? 'disabled' : ''; 
+        ?>
+        <button class="btn btn-outline-light me-2" data-bs-toggle="modal" data-bs-target="#createFolderModal" title="フォルダ作成" <?= $create_folder_disabled ?>>
             <i class="bi bi-folder-plus"></i>
             <span class="d-none d-sm-inline ms-1">フォルダ</span>
         </button>
-        <button id="headerUploadBtn" class="btn btn-light me-3" data-bs-toggle="modal" data-bs-target="#uploadFileModal" title="ファイルアップロード">
+        
+        <?php 
+            // アップロードはINBOXと通常フォルダで許可（ルートは禁止）
+            $upload_disabled = ($is_root_view || $is_star_view ) ? 'disabled' : ''; 
+        ?>
+        <button id="headerUploadBtn" class="btn btn-light me-3" data-bs-toggle="modal" data-bs-target="#uploadFileModal" title="ファイルアップロード" <?= $upload_disabled ?>>
             <i class="bi bi-cloud-arrow-up"></i>
             <span class="d-none d-sm-inline ms-1">ファイル</span>
         </button>

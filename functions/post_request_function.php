@@ -4,12 +4,24 @@ require_once __DIR__ . '/upload_function.php'; // 新しいアップロード関
 
 // --- POSTリクエスト処理 ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = $_POST['action'] ?? ''; $path_from_form = $_POST['path'] ?? ''; $target_dir_path = realpath(DATA_ROOT . '/' . $path_from_form);
-    if ($target_dir_path === false || strpos($target_dir_path, DATA_ROOT) !== 0) {
-        $target_dir_path = DATA_ROOT; $_SESSION['message'] = ['type' => 'danger', 'text' => '不正なディレクトリです。'];
+    $action = $_POST['action'] ?? ''; $path_from_form = $_POST['path'] ?? '';
+    $target_dir_path = realpath(DATA_ROOT . '/' . $path_from_form);
+    
+    $is_valid_for_action = ($target_dir_path !== false && strpos($target_dir_path, DATA_ROOT) === 0) || is_inbox_view($path_from_form);
+    
+    if (!$is_valid_for_action) {
+        $target_dir_path = DATA_ROOT;
+        $_SESSION['message'] = ['type' => 'danger', 'text' => '不正なディレクトリです。'];
     } else {
+        if (is_inbox_view($path_from_form)) {
+            $target_dir_path = get_inbox_path();
+        }
         switch ($action) {
             case 'create_folder':
+                if (is_inbox_view($path_from_form)) { 
+                    $_SESSION['message'] = ['type' => 'danger', 'text' => 'INBOX内またはルートディレクトリにはフォルダを作成できません。']; 
+                    break;
+                }
                 $folder_name = $_POST['folder_name'] ?? '';
                 if (!empty($folder_name) && strpbrk($folder_name, "\\/?%*:|\"<>") === false && !str_starts_with($folder_name, '.')) {
                     $new_folder_path = $target_dir_path . '/' . $folder_name;
@@ -22,6 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
 
             case 'upload_chunk':
+                if (is_inbox_view($path_from_form)) {
+                    $target_dir_path = get_inbox_path();
+                }
+                if (is_root_view($path_from_form)) { $_SESSION['message'] = ['type' => 'danger', 'text' => 'ルートディレクトリにはファイルをアップロードできません。']; break; }
                 handle_chunk_upload($target_dir_path);
                 // handle_chunk_upload 内で exit するため、ここでは何も実行されない
                 break;

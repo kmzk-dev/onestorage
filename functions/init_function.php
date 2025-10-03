@@ -15,6 +15,7 @@ if (!isset($main_config['data_root'])) {
     redirect('setting.php');
 }
 define('DATA_ROOT', $main_config['data_root']);
+get_inbox_path();
 
 global $file_config; // チャンク処理関数からアクセスするためにglobal宣言を追加
 // アップロードするファイル種別

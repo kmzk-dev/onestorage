@@ -35,7 +35,8 @@ function delete_directory($dir) {
 function get_all_directories_recursive($dir, &$results = []) { 
     $items = scandir($dir); 
     foreach ($items as $item) { 
-        if ($item == '.' || $item == '..') continue; 
+        if ($item == '.' || $item == '..') continue;
+        if (defined('INBOX_DIR_NAME') && $item == INBOX_DIR_NAME) continue;
         $path = $dir . DIRECTORY_SEPARATOR . $item; 
         if (is_dir($path)) { 
             if (str_starts_with($item, '.')) continue; 
@@ -55,6 +56,7 @@ function get_directory_tree($base_path) {
         $items = array_diff(scandir($current_path), ['.', '..']);
         natsort($items);
         foreach ($items as $item) {
+            if (defined('INBOX_DIR_NAME') && $item == INBOX_DIR_NAME) continue;
             if (str_starts_with($item, '.')) continue;
             $path = $current_path . DIRECTORY_SEPARATOR . $item;
             if (is_dir($path)) {
@@ -269,7 +271,14 @@ function toggle_star_item(string $web_path, string $item_name, bool $is_dir): ar
     $is_starred = false;
     
     // アイテムの存在チェックと容量取得
-    $full_path = realpath(DATA_ROOT . '/' . ltrim($web_path . '/' . $item_name, '/'));
+    $is_inbox_item = (defined('INBOX_DIR_NAME') && $web_path === 'inbox');
+    if ($is_inbox_item) {
+        // INBOXアイテムの場合、物理的な隠しディレクトリパスを使用
+        $full_path = realpath(DATA_ROOT . DIRECTORY_SEPARATOR . INBOX_DIR_NAME . DIRECTORY_SEPARATOR . $item_name);
+    } else {
+        // 通常のアイテムの場合
+        $full_path = realpath(DATA_ROOT . '/' . ltrim($web_path . '/' . $item_name, '/'));
+    }
     if ($full_path === false || strpos($full_path, DATA_ROOT) !== 0 || str_starts_with($item_name, '.')) {
         return ['success' => false, 'message' => '無効なアイテムです。'];
     }
@@ -307,4 +316,44 @@ function toggle_star_item(string $web_path, string $item_name, bool $is_dir): ar
     }
     
     return ['success' => false, 'message' => 'スター設定の保存に失敗しました。'];
+}
+
+/**
+ * INBOXの絶対パスを取得する
+ * DATA_ROOTが定義されていることが前提
+ * @return string INBOXの絶対パス
+ */
+function get_inbox_path(): string {
+    if (!defined('DATA_ROOT') || !defined('INBOX_DIR_NAME')) {
+        error_log('DATA_ROOT or INBOX_DIR_NAME is not defined.');
+        return '';
+    }
+    $inbox_path = DATA_ROOT . DIRECTORY_SEPARATOR . INBOX_DIR_NAME;
+    // 存在しない場合は作成を試みる
+    if (!is_dir($inbox_path)) {
+         // 権限は777は推奨されないが、既存のコードに合わせて0777
+        if (!mkdir($inbox_path, 0777, true)) {
+            error_log('Failed to create INBOX directory: ' . $inbox_path);
+        }
+    }
+    return $inbox_path;
+}
+
+/**
+ * ウェブパスがINBOXビューのパスであるかを判定する
+ * @param string $web_path 現在のウェブパス（index.phpで判定される 'inbox' など）
+ * @return bool
+ */
+function is_inbox_view(string $web_path): bool {
+    return $web_path === 'inbox';
+}
+
+/**
+ * ウェブパスがルートディレクトリを示すかを判定する
+ * @param string $web_path 現在のウェブパス
+ * @return bool
+ */
+function is_root_view(string $web_path): bool {
+    // web_pathが空文字列（?path=なしまたは?path=）の場合
+    return empty($web_path);
 }
