@@ -357,3 +357,83 @@ function is_root_view(string $web_path): bool {
     // web_pathが空文字列（?path=なしまたは?path=）の場合
     return empty($web_path);
 }
+
+
+/**
+ * スターアイテムの情報を更新する（移動、リネーム時）
+ * @param string $old_web_path 変更前のディレクトリのウェブパス
+ * @param string $old_item_name 変更前のアイテム名
+ * @param string $new_web_path 変更後のディレクトリのウェブパス
+ * @param string $new_item_name 変更後のアイテム名
+ * @return bool 成功ならtrue
+ */
+function update_star_item(string $old_web_path, string $old_item_name, string $new_web_path, string $new_item_name): bool {
+    global $DATA_ROOT;
+    
+    $old_hash = get_item_hash($old_web_path, $old_item_name);
+    $current_stars = load_star_config();
+    $updated = false;
+
+    foreach ($current_stars as &$star) {
+        if ($star['hash'] === $old_hash) {
+            $star['path'] = $new_web_path;
+            $star['name'] = $new_item_name;
+            // ハッシュを再計算
+            $star['hash'] = get_item_hash($new_web_path, $new_item_name);
+            
+            // サイズを再取得
+            $is_inbox_item = (defined('INBOX_DIR_NAME') && $new_web_path === 'inbox');
+            if ($is_inbox_item) {
+                // INBOXアイテムの場合、物理的な隠しディレクトリパスを使用
+                $full_path = realpath(DATA_ROOT . DIRECTORY_SEPARATOR . INBOX_DIR_NAME . DIRECTORY_SEPARATOR . $new_item_name);
+            } else {
+                // 通常のアイテムの場合
+                $item_path_from_root = ltrim($new_web_path . '/' . $new_item_name, '/');
+                $full_path = realpath(DATA_ROOT . '/' . $item_path_from_root);
+            }
+
+            if ($full_path !== false) {
+                // is_dirの情報は変更されない前提だが、念のため再チェック
+                $star['size'] = is_dir($full_path) ? get_directory_size($full_path) : filesize($full_path);
+            }
+            
+            $updated = true;
+            break;
+        }
+    }
+    unset($star); // 参照を解除
+
+    if ($updated) {
+        return save_star_config($current_stars);
+    }
+
+    return false; // スター登録されていなかった
+}
+
+/**
+ * スターアイテムの登録を解除する（アイテム削除時）
+ * @param string $web_path アイテムがあるディレクトリのウェブパス
+ * @param string $item_name アイテム名
+ * @return bool 成功ならtrue（アイテムが存在しなかった場合もtrueとする）
+ */
+function remove_star_item(string $web_path, string $item_name): bool {
+    $item_hash = get_item_hash($web_path, $item_name);
+    $current_stars = load_star_config();
+    $removed = false;
+
+    $new_stars = [];
+    foreach ($current_stars as $star) {
+        if ($star['hash'] !== $item_hash) {
+            $new_stars[] = $star;
+        } else {
+            $removed = true;
+        }
+    }
+
+    // 削除対象が存在しなかった、またはリストに変更がなかった場合はtrue
+    if (!$removed) {
+        return true;
+    }
+
+    return save_star_config($new_stars);
+}

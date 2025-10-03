@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $target_dir_path = DATA_ROOT;
         $_SESSION['message'] = ['type' => 'danger', 'text' => '不正なディレクトリです。'];
     } else {
+        // ★修正2: INBOXビューの場合、ターゲットディレクトリのパスを物理的なINBOXパスに上書き (rename, delete, move, upload のために必須)
         if (is_inbox_view($path_from_form)) {
             $target_dir_path = get_inbox_path();
         }
@@ -55,6 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (rename($old_path, $new_path)) { 
                     $_SESSION['message'] = ['type' => 'success', 'text' => '名前を変更しました。'];
                     rebuild_dir_cache();
+                    update_star_item($path_from_form, $old_name, $path_from_form, $final_new_name);
                 } 
                 else { $_SESSION['message'] = ['type' => 'danger', 'text' => '名前の変更に失敗しました。サーバーの権限を確認してください。']; }
                 break;
@@ -67,7 +69,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (!file_exists($source_path) || str_starts_with($item_name, '.')) { $error_count++; continue; }
                     if (is_dir($source_path) && strpos($destination_abs_path, $source_path) === 0) { $error_count++; continue; }
                     if (file_exists($dest_path)) { $error_count++; continue; }
-                    if (rename($source_path, $dest_path)) { $success_count++; } else { $error_count++; }
+                    if (rename($source_path, $dest_path)) { 
+                        $success_count++;
+                        update_star_item($path_from_form, $item_name, $destination_rel_path, $item_name);
+                    } else { $error_count++; }
                 }
                 $message = '';
                 if ($success_count > 0) $message .= $success_count . '個のアイテムを移動しました。';
@@ -84,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) { 
                         $_SESSION['message'] = ['type' => 'success', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'を削除しました。'];
                         rebuild_dir_cache();
+                        remove_star_item($path_from_form, $item_name);
                     } 
                     else { $_SESSION['message'] = ['type' => 'danger', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'の削除に失敗しました。']; }
                 } else { $_SESSION['message'] = ['type' => 'danger', 'text' => '対象が見つからないか、削除できないアイテムです。']; }
