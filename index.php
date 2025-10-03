@@ -35,7 +35,7 @@ if ($is_star_view) {
     foreach ($all_starred_items as $star_item) {
         // ★修正: INBOXアイテムの場合の物理パス解決ロジックを追加
         $is_inbox_starred = ($star_item['path'] === 'inbox');
-        
+
         if ($is_inbox_starred) {
             // INBOXアイテムの場合は、物理パスに .inbox を使用
             // DATA_ROOTとINBOX_DIR_NAMEが定義されている前提
@@ -77,7 +77,7 @@ if ($is_star_view) {
     $starred_hashes = [];
     foreach ($starred_items as $star) {
         // INBOXの論理パス 'inbox' にあるアイテムのハッシュのみをチェック
-        if ($star['path'] === $web_path) { 
+        if ($star['path'] === $web_path) {
             $starred_hashes[get_item_hash($star['path'], $star['name'])] = true;
         }
     }
@@ -98,7 +98,7 @@ if ($is_star_view) {
             'is_dir' => false,
             'size' => $size,
             'formatted_size' => format_bytes($size),
-            'is_starred' => isset($starred_hashes[$item_hash]), 
+            'is_starred' => isset($starred_hashes[$item_hash]),
             'path' => 'inbox', // INBOXアイテムのパスは 'inbox' を使用
         ];
     }
@@ -185,8 +185,9 @@ $json_star_view = json_encode($is_star_view);
     <?php require_once __DIR__ . '/templates/nav.php'; ?>
     <div class="container-fluid">
         <div class="row">
-            <nav id="sidebarMenu" class="col-md-4 col-lg-3 d-md-block bg-ligth sidebar collapse">
-                <div class="pt-3">
+            <nav id="sidebarMenu" class="col-md-4 col-lg-3 d-md-block bg-ligth sidebar collapse d-md-flex flex-column">
+
+                <div id="sidebarTopFixed" class="py-3 flex-shrink-0">
                     <ul class="nav flex-column px-3">
                         <li class="nav-item">
                             <a class="nav-link <?= $is_star_view ? 'active' : '' ?>" href="?path=starred">
@@ -199,17 +200,18 @@ $json_star_view = json_encode($is_star_view);
                             </a>
                         </li>
                         <hr>
-                        <li class="nav-item mb-3">
+                        <li class="nav-item">
                             <a class="nav-link px-3 <?= (empty($web_path) && !$is_star_view) ? 'active' : '' ?>" href="?path=">
                                 <i class="bi bi-house-door me-2"></i>home
                             </a>
                         </li>
                     </ul>
                 </div>
-                <div class="sidebar-sticky pt-3" style="height: calc(100vh - 120px);">
+
+                <div id="sidebarScrollable" class="sidebar-sticky overflow-auto">
                     <ul class="nav flex-column mb-2">
                         <?php
-                        function render_folder_tree($folders, $current_path, $level = 0)
+                        function render_folder_tree($folders, $current_path, $level = 0 ,$max_depth = 2)
                         {
                             $html = '';
                             $indent_px = 16 * ($level + 1);
@@ -230,8 +232,9 @@ $json_star_view = json_encode($is_star_view);
                                     $html .= '<i class="me-1" style="width: 1rem;"></i>';
                                 }
                                 $html .= '<i class="bi bi-folder me-2"></i>' . htmlspecialchars($folder['name'], ENT_QUOTES, 'UTF-8') . '</a>';
-                                if ($has_children) {
-                                    $html .= '<div class="collapse ' . ($is_collapsed_open ? 'show' : '') . '" id="' . $collapse_id . '"><ul class="nav flex-column">' . render_folder_tree($folder['children'], $current_path, $level + 1) . '</ul></div>';
+                                // ★修正: max_depthを超えていない場合のみ再帰的に子要素をレンダリング
+                                if ($has_children && $level < $max_depth) {
+                                    $html .= '<div class="collapse ' . ($is_collapsed_open ? 'show' : '') . '" id="' . $collapse_id . '"><ul class="nav flex-column">' . render_folder_tree($folder['children'], $current_path, $level + 1, $max_depth) . '</ul></div>'; // ★ max_depthを渡す
                                 }
                                 $html .= '</li>';
                             }
@@ -240,6 +243,10 @@ $json_star_view = json_encode($is_star_view);
                         echo render_folder_tree($sidebar_folders, $web_path);
                         ?>
                     </ul>
+                </div>
+
+                <div id="sidebarBottomFixed" class="p-3 border-top flex-shrink-0 text-center">
+                    <img class="img-fluid" src="img/Gemini_Generated_Image_dpkroidpkroidpkr.png" alt="ONE STORAGE Logo" style="width: 100%; max-width: 150px; margin: 0 auto;">
                 </div>
             </nav>
 
@@ -462,19 +469,49 @@ $json_star_view = json_encode($is_star_view);
                 showToast(phpMessage.type, phpMessage.text);
             }
 
+            // ★修正: モバイル対応のための絶対高さ計算ロジック
             function adjustLayout() {
                 const header = document.querySelector('nav.navbar');
                 const sidebar = document.getElementById('sidebarMenu');
-                const mainContent = document.querySelector('.main-content');
-                if (!header || !sidebar || !mainContent) return;
+                if (!header || !sidebar) return;
 
                 const headerHeight = header.offsetHeight;
-                sidebar.style.paddingTop = headerHeight + 'px';
-                //mainContent.style.paddingTop = (headerHeight) + 'px';
 
-                const sidebarSticky = sidebar.querySelector('.sidebar-sticky');
+                // 1. sidebarのtop位置をナビゲーションバーの高さに設定 (これは必須)
+                sidebar.style.top = headerHeight + 'px';
+
+                // モバイル表示 (mdブレークポイント未満) では計算を解除する
+                const isMobile = window.innerWidth < 768;
+                const sidebarSticky = document.getElementById('sidebarScrollable');
+
+                if (isMobile) {
+                    // モバイルでは絶対高さ計算を解除し、コンテンツ量に応じて自然な高さを取る
+                    if (sidebarSticky) {
+                        sidebarSticky.style.height = ''; // heightスタイルをクリア
+                    }
+                    return;
+                }
+
+                // --- デスクトップ表示での絶対高さ計算 ---
+
+                // 2. 上部固定部と下部固定部の高さを取得
+                const topFixed = document.getElementById('sidebarTopFixed');
+                const bottomFixed = document.getElementById('sidebarBottomFixed');
+
+                // getBoundingClientRect().height でPadding, Borderも含めた正確な高さを取得
+                const topFixedHeight = topFixed ? topFixed.getBoundingClientRect().height : 0;
+                const bottomFixedHeight = bottomFixed ? bottomFixed.getBoundingClientRect().height : 0;
+
+                // 3. サイドバーの親コンテナ（#sidebarMenu）が占めている実際の高さを取得
+                const sidebarActualHeight = sidebar.getBoundingClientRect().height;
+
+                // 4. 計算: (サイドバー全体の高さ) - (上部固定部の高さ) - (下部固定部の高さ)
+                const requiredHeight = sidebarActualHeight - topFixedHeight - bottomFixedHeight;
+
                 if (sidebarSticky) {
-                    sidebarSticky.style.height = `calc(100vh - ${headerHeight}px)`;
+                    // heightスタイルをpx値で直接設定することで、可変エリアに絶対的な領域を与えます。
+                    // これにより、コンテンツが少ない場合でも 'hoge' が最下部に固定されます。
+                    sidebarSticky.style.height = requiredHeight + 'px';
                 }
             }
 
