@@ -22,6 +22,8 @@ require_once __DIR__ . '/functions/post_request_function.php';
 $current_path_raw = $_GET['path'] ?? '';
 // ★スターカテゴリの判定
 $is_star_view = ($current_path_raw === 'starred');
+$is_inbox_view = is_inbox_view($current_path_raw); // helper_function.phpで定義した関数を使用
+$is_root_view = is_root_view($current_path_raw); // helper_function.phpで定義した関数を使用
 
 if ($is_star_view) {
     $current_path = ''; // 疑似的なパス
@@ -31,8 +33,19 @@ if ($is_star_view) {
 
     // アイテムのメタデータを更新・検証しながらリストを作成
     foreach ($all_starred_items as $star_item) {
-        $item_path_from_root = ltrim($star_item['path'] . '/' . $star_item['name'], '/');
-        $full_path = realpath(DATA_ROOT . '/' . $item_path_from_root);
+        // ★修正: INBOXアイテムの場合の物理パス解決ロジックを追加
+        $is_inbox_starred = ($star_item['path'] === 'inbox');
+        
+        if ($is_inbox_starred) {
+            // INBOXアイテムの場合は、物理パスに .inbox を使用
+            // DATA_ROOTとINBOX_DIR_NAMEが定義されている前提
+            $full_path = realpath(DATA_ROOT . DIRECTORY_SEPARATOR . INBOX_DIR_NAME . DIRECTORY_SEPARATOR . $star_item['name']);
+        } else {
+            // 通常のアイテムの場合は、保存されたパスを使用
+            $item_path_from_root = ltrim($star_item['path'] . '/' . $star_item['name'], '/');
+            $full_path = realpath(DATA_ROOT . '/' . $item_path_from_root);
+        }
+        // ★修正終わり
 
         if ($full_path !== false && strpos($full_path, DATA_ROOT) === 0) {
             // 存在チェックOK。サイズは再計算する方が安全
@@ -50,6 +63,44 @@ if ($is_star_view) {
         } else {
             // ファイルが存在しない場合は表示しない
         }
+    }
+    // ★INBOX表示の場合
+} elseif ($is_inbox_view) {
+    $current_path = get_inbox_path(); // 隠しディレクトリの絶対パスを取得
+    $web_path = 'inbox'; // 疑似的なウェブパス
+    $items = [];
+
+    $all_items = array_diff(scandir($current_path), ['.', '..']);
+    natsort($all_items);
+
+    $starred_items = load_star_config();
+    $starred_hashes = [];
+    foreach ($starred_items as $star) {
+        // INBOXの論理パス 'inbox' にあるアイテムのハッシュのみをチェック
+        if ($star['path'] === $web_path) { 
+            $starred_hashes[get_item_hash($star['path'], $star['name'])] = true;
+        }
+    }
+
+    foreach ($all_items as $item) {
+        if (str_starts_with($item, '.')) continue; // .で始まるファイルは無視
+        $item_path = $current_path . '/' . $item;
+        $is_dir = is_dir($item_path);
+
+        // INBOX内ではフォルダ作成が禁止されているため、フォルダは表示しない
+        if ($is_dir) continue;
+
+        $size = filesize($item_path);
+        $item_hash = get_item_hash($web_path, $item);
+
+        $items[] = [
+            'name' => $item,
+            'is_dir' => false,
+            'size' => $size,
+            'formatted_size' => format_bytes($size),
+            'is_starred' => isset($starred_hashes[$item_hash]), 
+            'path' => 'inbox', // INBOXアイテムのパスは 'inbox' を使用
+        ];
     }
 } else {
     // 通常のフォルダ表示の場合
@@ -100,13 +151,22 @@ $all_dirs = $dir_cache['list'];
 $breadcrumbs = [];
 
 if ($is_star_view) {
-    // ★スター表示のパンくずリスト
+    // スター表示のパンくずリスト
     $breadcrumbs[] = ['name' => 'Starred Items', 'path' => 'starred'];
-} elseif (!empty($web_path)) {
-    $tmp_path = '';
-    foreach (explode('/', $web_path) as $part) {
-        $tmp_path .= (empty($tmp_path) ? '' : '/') . $part;
-        $breadcrumbs[] = ['name' => $part, 'path' => $tmp_path];
+} elseif ($is_inbox_view) {
+    // INBOX表示のパンくずリスト
+    $breadcrumbs[] = ['name' => 'INBOX', 'path' => 'inbox'];
+} else {
+    // ★修正: ルートとサブフォルダ表示の場合、最初に 'home' を追加
+    $breadcrumbs[] = ['name' => 'home', 'path' => ''];
+
+    if (!empty($web_path)) {
+        // サブフォルダパスを構成要素ごとに分割して追加
+        $tmp_path = '';
+        foreach (explode('/', $web_path) as $part) {
+            $tmp_path .= (empty($tmp_path) ? '' : '/') . $part;
+            $breadcrumbs[] = ['name' => $part, 'path' => $tmp_path];
+        }
     }
 }
 $message = $_SESSION['message'] ?? null;
@@ -131,6 +191,11 @@ $json_star_view = json_encode($is_star_view);
                         <li class="nav-item">
                             <a class="nav-link <?= $is_star_view ? 'active' : '' ?>" href="?path=starred">
                                 <i class="bi bi-star-fill me-2" style="color: gold;"></i>Starred Items
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= $is_inbox_view ? 'active' : '' ?>" href="?path=inbox">
+                                <i class="bi bi-inbox-fill me-2 text-info"></i>INBOX
                             </a>
                         </li>
                         <hr>
@@ -183,12 +248,19 @@ $json_star_view = json_encode($is_star_view);
                     <div id="breadcrumbContainer" class="flex-grow-1">
                         <nav aria-label="breadcrumb">
                             <ol class="breadcrumb">
-                                <li class="breadcrumb-item"><a href="?path=" class="text-dark text-decoration-none">home</a></li>
                                 <?php foreach ($breadcrumbs as $crumb): ?>
                                     <li class="breadcrumb-item">
                                         <?php if ($crumb['name'] === 'Starred Items'): ?>
                                             <a href="?path=starred" class="text-dark text-decoration-none">
                                                 <i class="bi bi-star-fill me-1 text-warning"></i><?= htmlspecialchars($crumb['name'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                        <?php elseif ($crumb['name'] === 'INBOX'): ?>
+                                            <a href="?path=inbox" class="text-dark text-decoration-none">
+                                                <i class="bi bi-inbox-fill me-1 text-info"></i><?= htmlspecialchars($crumb['name'], ENT_QUOTES, 'UTF-8') ?>
+                                            </a>
+                                        <?php elseif ($crumb['name'] === 'home'): ?>
+                                            <a href="?path=inbox" class="text-dark text-decoration-none">
+                                                <i class="bi bi-inbox-fill me-1 text-info"></i>home
                                             </a>
                                         <?php else: ?>
                                             <a href="?path=<?= urlencode($crumb['path']) ?>" class="text-dark text-decoration-none">
