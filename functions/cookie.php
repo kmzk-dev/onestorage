@@ -1,11 +1,9 @@
 <?php
 // cookie_function.php: 認証クッキーの管理を行うヘルパー関数群
 require_once __DIR__ . '/../path.php';
-require_once __DIR__ . '/helper_function.php';
+require_once __DIR__ . '/helpers.php';
 
-// 認証クッキー名
 define('AUTH_COOKIE_NAME', 'one_storage_auth');
-// クッキーの有効期限 (例: 30日)
 define('AUTH_COOKIE_EXPIRY_DAYS', 30);
 
 /**
@@ -13,10 +11,9 @@ define('AUTH_COOKIE_EXPIRY_DAYS', 30);
  * @return string 生成された秘密鍵
  */
 function create_and_save_cookie_key(): string {
-    $key = generate_random_string(64); // 64文字のランダムな鍵
+    $key = generate_random_string(64);
     $config_dir = dirname(COOKIE_KEY_PATH);
 
-    // configディレクトリが存在しない場合は作成
     if (!is_dir($config_dir)) {
         mkdir($config_dir, 0755, true);
     }
@@ -52,18 +49,12 @@ function issue_auth_cookie(string $user): void {
         return;
     }
 
-    // ユーザー名と秘密鍵からハッシュを生成し、認証トークンとする (HMAC)
     $token = hash_hmac('sha256', $user, $secret_key);
-    
-    // クッキー値: base64(JSON{user, token})
     $cookie_value = base64_encode(json_encode(['user' => $user, 'token' => $token]));
-    
-    $expiry = time() + (86400 * AUTH_COOKIE_EXPIRY_DAYS); // 86400秒 = 1日
+    $expiry = time() + (86400 * AUTH_COOKIE_EXPIRY_DAYS);
 
     $is_secure = is_https();
     
-    // クッキーを発行 (HTTP Only, SameSite=Laxを設定)
-    // 開発環境を考慮し、Secureはfalseとしていますが、本番環境ではtrueを推奨します。
     setcookie(AUTH_COOKIE_NAME, $cookie_value, [
         'expires' => $expiry,
         'path' => '/',
@@ -98,16 +89,13 @@ function validate_auth_cookie(): bool {
         return false;
     }
     
-    // auth.phpの設定とクッキーのユーザー名を照合
     $auth_config = require AUTH_CONFIG_PATH; 
     if ($user !== $auth_config['user']) {
         return false;
     }
     
-    // 再度ハッシュを生成して比較
     $expected_token = hash_hmac('sha256', $user, $secret_key);
     
-    // 安全な比較
     return hash_equals($expected_token, $received_token);
 }
 

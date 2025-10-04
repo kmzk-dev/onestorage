@@ -1,7 +1,7 @@
 <?php
 // mfa_function.php: Google Authenticator (TOTP) 連携のための関数群
 require_once __DIR__ . '/../path.php';
-require_once __DIR__ . '/helper_function.php';
+require_once __DIR__ . '/helpers.php';
 
 // Base32エンコーディングの文字セット
 define('BASE32_CHARS', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567');

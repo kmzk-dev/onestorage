@@ -1,15 +1,10 @@
 <?php
-require_once __DIR__ . '/helper_function.php';
-require_once __DIR__ . '/init_function.php'; // $file_config を利用するために読み込む
+require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/init.php'; // $file_config を利用するために読み込む
 
-/**
- * チャンクアップロードを処理する
- * @param string $target_dir_path アップロード先のディレクトリパス
- */
 function handle_chunk_upload(string $target_dir_path): void {
     global $file_config;
 
-    // 定期的なクリーンアップ
     cleanup_stale_chunks();
 
     $chunk = $_FILES['chunk'] ?? null;
@@ -52,14 +47,13 @@ function handle_chunk_upload(string $target_dir_path): void {
         // サイズ検証
         $max_size_bytes = $file_config['max_file_size_mb'] * 1024 * 1024;
         if (filesize($temp_file_path) !== $total_size || $total_size > $max_size_bytes) {
-            unlink($temp_file_path); // 失敗したので一時ファイルを削除
+            unlink($temp_file_path);
             $response['text'] = 'ファイルサイズが不正か、上限を超えています。(' . $file_config['max_file_size_mb'] . 'MB)';
             header('Content-Type: application/json');
             echo json_encode($response);
             exit;
         }
 
-        // 保存先パス
         $final_path = $target_dir_path . DIRECTORY_SEPARATOR . $original_name;
 
         if (file_exists($final_path)) {
@@ -77,7 +71,6 @@ function handle_chunk_upload(string $target_dir_path): void {
         exit;
     }
 
-    // 中間チャンク成功レスポンス
     header('Content-Type: application/json');
     echo json_encode(['type' => 'processing', 'text' => 'Chunk ' . ($chunk_index + 1) . '/' . $total_chunks . ' processed.']);
     exit;

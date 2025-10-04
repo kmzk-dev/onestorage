@@ -8,15 +8,15 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 //初期設定
 require_once __DIR__ . '/path.php';
-require_once __DIR__ . '/functions/init_function.php';
-require_once __DIR__ . '/functions/helper_function.php';
+require_once __DIR__ . '/functions/init.php';
+require_once __DIR__ . '/functions/helpers.php';
 //認証
-require_once __DIR__ . '/functions/cookie_function.php'; // 追加
-require_once __DIR__ . '/functions/auth_function.php';
+require_once __DIR__ . '/functions/cookie.php';
+require_once __DIR__ . '/functions/auth.php';
 check_authentication();
 
-require_once __DIR__ . '/functions/get_request_function.php';
-require_once __DIR__ . '/functions/post_request_function.php';
+require_once __DIR__ . '/functions/handler_get_method.php';
+require_once __DIR__ . '/functions/handler_post_method.php';
 
 // --- 画面 ---
 $current_path_raw = $_GET['path'] ?? '';
@@ -149,19 +149,14 @@ $dir_cache = load_dir_cache();
 $sidebar_folders = $dir_cache['tree'];
 $all_dirs = $dir_cache['list'];
 $breadcrumbs = [];
-
+//パンくずリスト
 if ($is_star_view) {
-    // スター表示のパンくずリスト
     $breadcrumbs[] = ['name' => 'Starred Items', 'path' => 'starred'];
 } elseif ($is_inbox_view) {
-    // INBOX表示のパンくずリスト
     $breadcrumbs[] = ['name' => 'INBOX', 'path' => 'inbox'];
 } else {
-    // ★修正: ルートとサブフォルダ表示の場合、最初に 'home' を追加
     $breadcrumbs[] = ['name' => 'home', 'path' => ''];
-
     if (!empty($web_path)) {
-        // サブフォルダパスを構成要素ごとに分割して追加
         $tmp_path = '';
         foreach (explode('/', $web_path) as $part) {
             $tmp_path .= (empty($tmp_path) ? '' : '/') . $part;
@@ -179,10 +174,10 @@ $json_star_view = json_encode($is_star_view);
 ?>
 <!DOCTYPE html>
 <html lang="ja">
-<?php require_once __DIR__ . '/templates/head.php'; ?>
+<?php require_once __DIR__ . '/static/template_head.php'; ?>
 
 <body>
-    <?php require_once __DIR__ . '/templates/nav.php'; ?>
+    <?php require_once __DIR__ . '/static/template_nav.php'; ?>
     <div class="container-fluid">
         <div class="row">
             <nav id="sidebarMenu" class="col-md-4 col-lg-3 d-md-block bg-ligth sidebar collapse d-md-flex flex-column">
@@ -232,7 +227,7 @@ $json_star_view = json_encode($is_star_view);
                                     $html .= '<i class="me-1" style="width: 1rem;"></i>';
                                 }
                                 $html .= '<i class="bi bi-folder me-2"></i>' . htmlspecialchars($folder['name'], ENT_QUOTES, 'UTF-8') . '</a>';
-                                // ★修正: max_depthを超えていない場合のみ再帰的に子要素をレンダリング
+                                // max_depthを超えていない場合のみ再帰的に子要素をレンダリング
                                 if ($has_children && $level < $max_depth) {
                                     $html .= '<div class="collapse ' . ($is_collapsed_open ? 'show' : '') . '" id="' . $collapse_id . '"><ul class="nav flex-column">' . render_folder_tree($folder['children'], $current_path, $level + 1, $max_depth) . '</ul></div>'; // ★ max_depthを渡す
                                 }
@@ -246,7 +241,7 @@ $json_star_view = json_encode($is_star_view);
                 </div>
 
                 <div id="sidebarBottomFixed" class="p-3 border-top flex-shrink-0 text-center">
-                    <img class="img-fluid" src="img/Gemini_Generated_Image_dpkroidpkroidpkr.png" alt="ONE STORAGE Logo" style="width: 100%; max-width: 150px; margin: 0 auto;">
+                    <img class="img-fluid" src="static/img_logo.PNG" alt="ONE STORAGE Logo" style="width: 100%; max-width: 150px; margin: 0 auto;">
                 </div>
             </nav>
 
@@ -388,19 +383,16 @@ $json_star_view = json_encode($is_star_view);
     </div>
 
     <?php
-    // トースト
-    require_once __DIR__ . '/templates/components/toast_container.php';
-    // モーダル
-    require_once __DIR__ . '/templates/components/create_folder_modal.php';
-    require_once __DIR__ . '/templates/components/upload_file_modal.php';
-    require_once __DIR__ . '/templates/components/rename_item_modal.php';
-    require_once __DIR__ . '/templates/components/move_item_modal.php'
+    require_once __DIR__ . '/static/component_toast_container.php';
+    require_once __DIR__ . '/static/component_create_folder_modal.php';
+    require_once __DIR__ . '/static/component_upload_file_modal.php';
+    require_once __DIR__ . '/static/component_rename_item_modal.php';
+    require_once __DIR__ . '/static/component_move_item_modal.php'
     ?>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const phpMessage = <?= $json_message ?>;
-        // ★スター機能の追加
         const STAR_API_URL = '<?= $STAR_API_URL ?>';
         const isStarView = <?= $json_star_view ?>;
 
@@ -469,48 +461,32 @@ $json_star_view = json_encode($is_star_view);
                 showToast(phpMessage.type, phpMessage.text);
             }
 
-            // ★修正: モバイル対応のための絶対高さ計算ロジック
             function adjustLayout() {
                 const header = document.querySelector('nav.navbar');
                 const sidebar = document.getElementById('sidebarMenu');
                 if (!header || !sidebar) return;
 
                 const headerHeight = header.offsetHeight;
-
-                // 1. sidebarのtop位置をナビゲーションバーの高さに設定 (これは必須)
                 sidebar.style.top = headerHeight + 'px';
-
-                // モバイル表示 (mdブレークポイント未満) では計算を解除する
                 const isMobile = window.innerWidth < 768;
                 const sidebarSticky = document.getElementById('sidebarScrollable');
 
                 if (isMobile) {
-                    // モバイルでは絶対高さ計算を解除し、コンテンツ量に応じて自然な高さを取る
                     if (sidebarSticky) {
-                        sidebarSticky.style.height = ''; // heightスタイルをクリア
+                        sidebarSticky.style.height = '';
                     }
                     return;
                 }
 
                 // --- デスクトップ表示での絶対高さ計算 ---
-
-                // 2. 上部固定部と下部固定部の高さを取得
                 const topFixed = document.getElementById('sidebarTopFixed');
                 const bottomFixed = document.getElementById('sidebarBottomFixed');
-
-                // getBoundingClientRect().height でPadding, Borderも含めた正確な高さを取得
                 const topFixedHeight = topFixed ? topFixed.getBoundingClientRect().height : 0;
                 const bottomFixedHeight = bottomFixed ? bottomFixed.getBoundingClientRect().height : 0;
-
-                // 3. サイドバーの親コンテナ（#sidebarMenu）が占めている実際の高さを取得
                 const sidebarActualHeight = sidebar.getBoundingClientRect().height;
-
-                // 4. 計算: (サイドバー全体の高さ) - (上部固定部の高さ) - (下部固定部の高さ)
                 const requiredHeight = sidebarActualHeight - topFixedHeight - bottomFixedHeight;
 
                 if (sidebarSticky) {
-                    // heightスタイルをpx値で直接設定することで、可変エリアに絶対的な領域を与えます。
-                    // これにより、コンテンツが少ない場合でも 'hoge' が最下部に固定されます。
                     sidebarSticky.style.height = requiredHeight + 'px';
                 }
             }
@@ -565,19 +541,15 @@ $json_star_view = json_encode($is_star_view);
 
                     isUploading = true;
                     setUploadUiState(true);
-
                     const file = uploadQueue.shift(); // キューの先頭からファイルを取得
-
                     // .で始まるファイルのアップロードを禁止
                     if (file.name.startsWith('.')) {
                         showToast('warning', `[${file.name}] はドットで始まるためスキップされました。`);
-                        processUploadQueue(); // 次のファイルへ
+                        processUploadQueue();
                         return;
                     }
-
                     await uploadFileInChunks(file);
-
-                    processUploadQueue(); // 次のファイルの処理へ
+                    processUploadQueue();
                 }
 
                 async function uploadFileInChunks(file) {
@@ -657,7 +629,7 @@ $json_star_view = json_encode($is_star_view);
                 }
             }
 
-            // ★スター機能のトグル処理
+            // スター機能のトグル処理
             const starToggleBtns = document.querySelectorAll('.star-toggle-btn');
             starToggleBtns.forEach(button => {
                 button.addEventListener('click', async (e) => {
@@ -667,7 +639,6 @@ $json_star_view = json_encode($is_star_view);
                     const isDir = button.getAttribute('data-is-dir') === '1';
                     const icon = button.querySelector('i');
 
-                    // ロード状態を一時的に設定
                     const originalIconClass = icon.className;
                     const originalTitle = button.title;
                     icon.className = 'bi bi-arrow-repeat spin-animation text-info';
@@ -704,12 +675,10 @@ $json_star_view = json_encode($is_star_view);
 
                                 // スタービューの場合はアイテムをリストから削除し、ページをリロードしてリストを更新
                                 if (isStarView) {
-                                    // 最も近い file-row を削除
                                     const row = button.closest('.file-row');
                                     if (row) {
                                         row.remove();
                                     }
-                                    // すべて削除されたら再ロード
                                     if (document.querySelectorAll('.file-row').length === 0) {
                                         location.reload();
                                     }
@@ -717,16 +686,15 @@ $json_star_view = json_encode($is_star_view);
                             }
                         } else {
                             showToast('danger', data.message);
-                            icon.className = originalIconClass; // エラー時は元に戻す
+                            icon.className = originalIconClass;
                             button.title = originalTitle;
                         }
                     } catch (error) {
                         showToast('danger', `スター操作中にエラーが発生しました: ${error.message}`);
-                        icon.className = originalIconClass; // エラー時は元に戻す
+                        icon.className = originalIconClass;
                         button.title = originalTitle;
                     } finally {
                         button.disabled = false;
-                        // スピンアニメーション用のクラスを削除するために再設定
                         if (icon.className.includes('spin-animation')) {
                             icon.className = icon.className.replace(' spin-animation', '');
                         }
@@ -734,7 +702,6 @@ $json_star_view = json_encode($is_star_view);
                 });
             });
 
-            // スピンアニメーションのCSSをインラインで追加
             const style = document.createElement('style');
             style.textContent = `
             .spin-animation {

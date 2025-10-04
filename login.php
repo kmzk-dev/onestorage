@@ -1,13 +1,12 @@
 <?php
 require_once __DIR__ . '/path.php';
-require_once __DIR__ . '/functions/helper_function.php';
-require_once __DIR__ . '/functions/cookie_function.php'; // 追加
+require_once __DIR__ . '/functions/helpers.php';
+require_once __DIR__ . '/functions/cookie.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 認証情報の検証
 if (!file_exists(AUTH_CONFIG_PATH) || !file_exists(MFA_SECRET_PATH)) {
     redirect('setting.php');
 }
@@ -15,7 +14,7 @@ if (validate_auth_cookie()) {
     redirect('index.php');
 }
 
-$error_message = ''; //　エラー返却の格納
+$error_message = '';
 
 // バリデーション
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -31,8 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            $_SESSION['auth_passed'] = true; // 1段階目認証成功フラグ
-            redirect('mfa_login.php'); // MFA認証画面へ
+            $_SESSION['auth_passed'] = true;
+            redirect('mfa_login.php');
         } else {
             $error_message = 'メールアドレスまたはパスワードが間違っています。';
         }
@@ -58,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="col-lg-5 col-md-7 col-sm-9">
                 <div class="p-4 border rounded-3 bg-white shadow-sm">
                     <div class="col-4 mx-auto mb-3">
-                        <img class="img-fluid" src="img/Gemini_Generated_Image_dpkroidpkroidpkr.png" alt="">
+                        <img class="img-fluid" src="static/img_logo.PNG" alt="">
                     </div>
                     <p class="text-center text-muted h6 ">ユーザーログイン</p>
                     <?php if ($error_message): ?>

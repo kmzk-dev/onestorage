@@ -1,6 +1,6 @@
 <?php
-require_once __DIR__ . '/helper_function.php';
-require_once __DIR__ . '/upload_function.php'; // 新しいアップロード関数を読み込む
+require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/chunk_upload.php';
 
 // --- POSTリクエスト処理 ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

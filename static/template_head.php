@@ -1,7 +1,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>One Storage</title>
+    <title>ONE STORAGE</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <style>
@@ -22,7 +22,7 @@
         
         .file-list .file-row:hover { background-color: #f8f9fa; }
         .file-list a { text-decoration: none; color: inherit; }
-        /* ★スターボタンのスタイル */
+        /*スターボタンのスタイル */
         .file-row .star-toggle-btn {
             border: none;
             background-color: transparent;

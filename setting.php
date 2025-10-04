@@ -1,9 +1,9 @@
 <?php
 // PHPロジック: 初期設定の状態判定とデータフォルダの強制作成
 require_once __DIR__ . '/path.php';
-require_once __DIR__ . '/functions/helper_function.php';
-require_once __DIR__ . '/functions/cookie_function.php';
-require_once __DIR__ . '/functions/mfa_function.php';
+require_once __DIR__ . '/functions/helpers.php';
+require_once __DIR__ . '/functions/cookie.php';
+require_once __DIR__ . '/functions/mfa.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -17,7 +17,7 @@ $initial_data_dir_name = '';
 if (!$data_root_config_exists) {
     $htaccess_content = "Order allow,deny\nDeny from all";
     $random_part = generate_random_string(15);
-    $data_dir_name = 'data-' . $random_part;
+    $data_dir_name = 'data' . $random_part;
     $data_dir_path = __DIR__ . '/' . $data_dir_name;
     
     // configディレクトリの最低限の作成 (htaccess用)
@@ -118,7 +118,7 @@ $default_max_size = 750;
             <div class="col-lg-8 col-md-10">
                 <div class="p-1">
                     <div class="col-4 mx-auto">
-                        <img class="img-fluid" src="img/Gemini_Generated_Image_dpkroidpkroidpkr.png" alt="">
+                        <img class="img-fluid" src="static/img_logo.PNG" alt="">
                     </div>
                     <p class="text-center text-muted">あなただけのストレージサービスで</br>プライバシーを守りましょう</p>
 

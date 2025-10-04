@@ -1,9 +1,4 @@
 <?php
-// custom_functions.php
-// ヘルパー関数群
-//require_once __DIR__ . '/init_function.php';
-
-
 // ランダムな15桁 -data-[15桁]でルートフォルダ名を作成
 function generate_random_string(int $length = 15): string {
     $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';

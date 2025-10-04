@@ -1,8 +1,8 @@
 <?php
 require_once __DIR__ . '/../path.php';
-require_once __DIR__ . '/helper_function.php';
-require_once __DIR__ . '/cookie_function.php';
-require_once __DIR__ . '/mfa_function.php';
+require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/cookie.php';
+require_once __DIR__ . '/mfa.php';
 
 // ヘッダーを設定してJSONレスポンスであることを明示
 header('Content-Type: application/json');
@@ -44,16 +44,16 @@ switch ($action) {
 
     case 'finalize_setup':
         // 全てのファイルが存在するか最終チェック
-        $files_exist = file_exists(AUTH_CONFIG_PATH) 
-            && file_exists(MAIN_CONFIG_PATH) 
-            && file_exists(ACCEPT_CONFIG_PATH) 
+        $files_exist = file_exists(AUTH_CONFIG_PATH)
+            && file_exists(MAIN_CONFIG_PATH)
+            && file_exists(ACCEPT_CONFIG_PATH)
             && file_exists(MFA_SECRET_PATH);
-            
+
         if ($files_exist) {
             // config.phpからユーザー情報を取得
             $auth_config = require AUTH_CONFIG_PATH;
             // ログインクッキー発行 (MFAは完了しているため直接発行)
-            issue_auth_cookie($auth_config['user']); 
+            issue_auth_cookie($auth_config['user']);
             $response = ['success' => true, 'message' => '設定が完了しました。'];
         } else {
             $response = ['success' => false, 'message' => '必須設定ファイルが不足しています。'];
@@ -70,7 +70,8 @@ exit;
  * Step 1: config.php, cookie_key.php を確認・作成するAPI
  * config.phpとデータフォルダはsetting.phpのロード時に作成済みとする前提
  */
-function create_storage_data_config_api(): array {
+function create_storage_data_config_api(): array
+{
     $error_messages = [];
 
     // config.phpの存在チェック (強制作成ロジックが失敗していないか)
@@ -84,7 +85,7 @@ function create_storage_data_config_api(): array {
             $error_messages[] = 'クッキー認証キーの作成に失敗しました。';
         }
     }
-    
+
     if (empty($error_messages)) {
         return ['success' => true, 'message' => '基本設定ファイル(config.php, cookie_key.php)を作成しました。'];
     } else {
@@ -95,11 +96,12 @@ function create_storage_data_config_api(): array {
 /**
  * Step 2: accept.json を作成するAPI
  */
-function create_storage_accept_config_api(array $extensions, int $max_size): array {
+function create_storage_accept_config_api(array $extensions, int $max_size): array
+{
     if (empty($extensions) || $max_size <= 0) {
         return ['success' => false, 'message' => '許可する拡張子とファイルサイズ上限を指定してください。'];
     }
-    
+
     $config_dir = dirname(AUTH_CONFIG_PATH);
     if (!is_dir($config_dir)) {
         // configディレクトリが存在しない場合は作成
@@ -111,7 +113,7 @@ function create_storage_accept_config_api(array $extensions, int $max_size): arr
         'allowed_extensions' => $extensions,
         'max_file_size_mb' => $max_size
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    
+
     try {
         if (file_put_contents(ACCEPT_CONFIG_PATH, $accept_config_content) !== false) {
             return ['success' => true, 'message' => '拡張子設定ファイル(accept.json)を作成しました。'];
@@ -119,7 +121,7 @@ function create_storage_accept_config_api(array $extensions, int $max_size): arr
             return ['success' => false, 'message' => '拡張子設定ファイル(accept.json)の書き込みに失敗しました。'];
         }
     } catch (\Throwable $th) {
-         return ['success' => false, 'message' => '拡張子設定ファイル(accept.json)の作成に失敗しました。' . $th->getMessage()];
+        return ['success' => false, 'message' => '拡張子設定ファイル(accept.json)の作成に失敗しました。' . $th->getMessage()];
     }
 }
 
@@ -127,7 +129,8 @@ function create_storage_accept_config_api(array $extensions, int $max_size): arr
 /**
  * ユーザーアカウント（auth.php）を作成するAPI
  */
-function register_account_api(string $user, string $password): array {
+function register_account_api(string $user, string $password): array
+{
     // バリデーション
     if (empty($user) || !filter_var($user, FILTER_VALIDATE_EMAIL)) {
         return ['success' => false, 'message' => 'メールアドレスの形式が正しくありません。'];
@@ -159,23 +162,24 @@ function register_account_api(string $user, string $password): array {
 /**
  * MFAシークレットキーを生成し、ファイルに保存するAPI
  */
-function generate_mfa_secret_api(string $user): array {
+function generate_mfa_secret_api(string $user): array
+{
     if (empty($user)) {
-         // auth.phpからユーザー名を取得
-         if (file_exists(AUTH_CONFIG_PATH)) {
-             $auth_config = require AUTH_CONFIG_PATH;
-             $user = $auth_config['user'] ?? 'user@onestorage.local';
-         } else {
-             $user = 'user@onestorage.local';
-         }
+        // auth.phpからユーザー名を取得
+        if (file_exists(AUTH_CONFIG_PATH)) {
+            $auth_config = require AUTH_CONFIG_PATH;
+            $user = $auth_config['user'] ?? 'user@onestorage.local';
+        } else {
+            $user = 'user@onestorage.local';
+        }
     }
-    
+
     // 既存のキーがあればそれを返す
     if (file_exists(MFA_SECRET_PATH)) {
         $secret_key = get_mfa_secret();
         return build_mfa_response($secret_key, $user, 'MFAキーは既に存在します。');
     }
-    
+
     // 新しいキーを生成し保存
     $secret_key = generate_mfa_secret(16);
     if (save_mfa_secret($secret_key)) {
@@ -188,21 +192,22 @@ function generate_mfa_secret_api(string $user): array {
 /**
  * MFA APIレスポンスを構築するヘルパー
  */
-function build_mfa_response(string $secret_key, string $user, string $message): array {
+function build_mfa_response(string $secret_key, string $user, string $message): array
+{
     // URLエンコード
     $issuer = rawurlencode('One Storage');
     $label = rawurlencode($user);
     $secret_url_encoded = rawurlencode($secret_key);
-    
+
     // QRコードのURIを構築 (otpauth://totp/Issuer:Label?secret=SECRET&issuer=Issuer)
     $otp_auth_uri = "otpauth://totp/{$issuer}:{$label}?secret={$secret_url_encoded}&issuer={$issuer}";
 
     // QRコード画像URLを構築 (goqr.me API)
     $qr_code_url = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . rawurlencode($otp_auth_uri);
-    
+
     return [
-        'success' => true, 
-        'message' => $message, 
+        'success' => true,
+        'message' => $message,
         'secret' => $secret_key,
         'qr_code_url' => $qr_code_url,
     ];
