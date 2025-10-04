@@ -207,7 +207,7 @@ $json_star_view = json_encode($is_star_view);
                 <div id="sidebarScrollable" class="sidebar-sticky overflow-auto">
                     <ul class="nav flex-column mb-2">
                         <?php
-                        function render_folder_tree($folders, $current_path, $level = 0 ,$max_depth = 2)
+                        function render_folder_tree($folders, $current_path, $level = 0, $max_depth = 2)
                         {
                             $html = '';
                             $indent_px = 16 * ($level + 1);
@@ -279,6 +279,7 @@ $json_star_view = json_encode($is_star_view);
                         <span class="text-muted me-3"><strong id="selectionCount">0</strong>個選択中</span>
                         <?php if (!$is_star_view): ?>
                             <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#moveItemsModal"><i class="bi bi-folder-symlink"></i> 選択項目を移動</button>
+                            <button class="btn btn-danger btn-sm" id="batchDeleteBtn"><i class="bi bi-trash"></i> 選択項目を削除</button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -390,6 +391,11 @@ $json_star_view = json_encode($is_star_view);
     require_once __DIR__ . '/static/component_rename_item_modal.php';
     require_once __DIR__ . '/static/component_move_item_modal.php'
     ?>
+    <form action="index.php" method="post" id="batchDeleteForm" class="d-none">
+        <input type="hidden" name="action" value="delete_items">
+        <input type="hidden" name="path" value="<?= htmlspecialchars($web_path, ENT_QUOTES, 'UTF-8') ?>">
+        <input type="hidden" name="items_json" id="delete_items_json">
+    </form>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -722,6 +728,12 @@ $json_star_view = json_encode($is_star_view);
             const tableActionsContainer = document.getElementById('tableActionsContainer');
             const selectionCountSpan = document.getElementById('selectionCount');
             const moveItemsJsonInput = document.getElementById('move_items_json');
+            // ★追加: 一括削除関連の要素を取得
+            const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+            const batchDeleteForm = document.getElementById('batchDeleteForm');
+            const deleteItemsJsonInput = document.getElementById('delete_items_json');
+            // ★追加終わり
+
 
             function updateActionHeader() {
                 const selectedItems = Array.from(itemCheckboxes).filter(cb => cb.checked);
@@ -733,6 +745,11 @@ $json_star_view = json_encode($is_star_view);
                     if (moveItemsJsonInput) {
                         moveItemsJsonInput.value = JSON.stringify(selectedItems.map(cb => cb.value));
                     }
+                    // 追記: 削除用JSONも更新
+                    if (deleteItemsJsonInput) {
+                        deleteItemsJsonInput.value = JSON.stringify(selectedItems.map(cb => cb.value));
+                    }
+                    // 追記終わり
                 } else {
                     breadcrumbContainer.classList.remove('d-none');
                     tableActionsContainer.classList.add('d-none');
@@ -755,7 +772,28 @@ $json_star_view = json_encode($is_star_view);
                     updateActionHeader();
                 });
             });
+            // ★追加: 一括削除ボタンのイベントリスナー
+            if (batchDeleteBtn) {
+                batchDeleteBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const selectedItems = Array.from(itemCheckboxes).filter(cb => cb.checked).map(cb => cb.value);
+                    const count = selectedItems.length;
 
+                    if (count === 0) {
+                        showToast('warning', '削除するアイテムを選択してください。');
+                        return;
+                    }
+
+                    const confirmMessage = `本当に選択された ${count} 個のアイテムを削除しますか？\nこの操作は元に戻せません。`;
+
+                    if (confirm(confirmMessage)) {
+                        deleteItemsJsonInput.value = JSON.stringify(selectedItems);
+                        // フォームを送信
+                        batchDeleteForm.submit();
+                    }
+                });
+            }
+            // ★追加終わり
             const sidebarNav = document.getElementById('sidebarMenu');
             if (sidebarNav) {
                 sidebarNav.querySelectorAll('.toggle-icon').forEach(icon => {
