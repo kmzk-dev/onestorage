@@ -1,7 +1,5 @@
 <?php
-if (!defined('ONESTORAGE_RUNNING')) {
-    die('Access Denied: Invalid execution context.');
-}
+
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/init.php'; // $file_config を利用するために読み込む
 

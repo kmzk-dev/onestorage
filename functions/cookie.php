@@ -1,7 +1,5 @@
 <?php
-if (!defined('ONESTORAGE_RUNNING')) {
-    die('Access Denied: Invalid execution context.');
-}
+
 // cookie_function.php: 認証クッキーの管理を行うヘルパー関数群
 require_once __DIR__ . '/../path.php';
 require_once __DIR__ . '/helpers.php';

@@ -1,7 +1,5 @@
 <?php
-if (!defined('ONESTORAGE_RUNNING')) {
-    die('Access Denied: Invalid execution context.');
-}
+
 // mfa_function.php: Google Authenticator (TOTP) 連携のための関数群
 require_once __DIR__ . '/../path.php';
 require_once __DIR__ . '/helpers.php';

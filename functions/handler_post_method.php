@@ -1,7 +1,5 @@
 <?php
-if (!defined('ONESTORAGE_RUNNING')) {
-    die('Access Denied: Invalid execution context.');
-}
+
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/chunk_upload.php';
 
@@ -137,8 +135,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $success_count = 0;
                 $error_count = 0;
+                $folder_skip_count = 0; // ★変更: フォルダスキップ用のカウンターを追加
 
                 foreach ($items_to_delete as $item_name) {
+                    // セキュリティチェックとパス解決
                     $item_path = realpath($target_dir_path . '/' . $item_name);
 
                     // アイテムが存在し、$target_dir_path の下にあること、隠しアイテムでないことを確認
@@ -146,42 +146,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         $is_dir = is_dir($item_path);
 
-                        // 削除実行
-                        if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) {
+                        // ★変更: フォルダの場合はスキップしてカウント
+                        if ($is_dir) {
+                            $folder_skip_count++;
+                            continue; // 次のアイテムへ
+                        }
+
+                        // 削除実行 (ファイルのみ)
+                        if (unlink($item_path)) {
                             $success_count++;
+                            // スター設定から削除
                             remove_star_item($path_from_form, $item_name);
                         } else {
                             $error_count++;
                         }
                     } else {
-                        $error_count++;
+                        $error_count++; // アイテムが見つからないか、不正なアイテム 
                     }
                 }
 
                 $message = '';
-                if ($success_count > 0) $message .= $success_count . '個のアイテムを削除しました。';
+                if ($success_count > 0) $message .= $success_count . '個のファイルを削除しました。';
+                // ★変更: スキップされたフォルダの通知を追加
+                if ($folder_skip_count > 0) $message .= $folder_skip_count . '個のフォルダは一括削除から除外されました。';
                 if ($error_count > 0) $message .= $error_count . '個のアイテムは削除できませんでした（対象が見つからないか、権限がありません、または隠しアイテムです）。';
 
                 if ($success_count > 0) {
+                    // ファイルが削除された場合はキャッシュを再構築
                     rebuild_dir_cache();
                 }
 
-                $_SESSION['message'] = ['type' => $error_count > 0 ? 'warning' : 'success', 'text' => $message];
+                // ★変更: 成功・警告・エラーの優先度を設定
+                if ($success_count > 0 && $error_count === 0 && $folder_skip_count === 0) {
+                    $type = 'success';
+                } elseif ($error_count > 0 || $folder_skip_count > 0) {
+                    $type = 'warning';
+                } else {
+                    $type = 'danger';
+                }
+
+                $_SESSION['message'] = ['type' => $type, 'text' => $message];
                 break;
             case 'delete_item':
-                $item_name = $_POST['item_name'] ?? '';
-                $item_path = realpath($target_dir_path . '/' . $item_name);
+                $item_name = $_POST['item_name'] ?? ''; 
+                $item_path = realpath($target_dir_path . '/' . $item_name); // 物理パスの解決
+                
                 if ($item_path && strpos($item_path, $target_dir_path) === 0 && !str_starts_with($item_name, '.')) {
                     $is_dir = is_dir($item_path);
-                    if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) {
+                    
+                    // フォルダ/ファイルの削除実行 (フォルダの場合はdelete_directoryで再帰的に削除)
+                    if (($is_dir && delete_directory($item_path)) || (!$is_dir && unlink($item_path))) { 
                         $_SESSION['message'] = ['type' => 'success', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'を削除しました。'];
-                        rebuild_dir_cache();
-                        remove_star_item($path_from_form, $item_name);
-                    } else {
-                        $_SESSION['message'] = ['type' => 'danger', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'の削除に失敗しました。'];
+
+                        // ★スター情報クリーンアップロジック
+                        if ($is_dir) {
+                            // フォルダ削除の場合: フォルダ自身と配下のアイテムのスター情報をクリーンアップ
+                            // $path_from_form は現在のディレクトリのWebパス、 $item_name は削除されたフォルダ名
+                            $deleted_item_web_path = ltrim($path_from_form . '/' . $item_name, '/');
+                            clean_star_items_for_deleted_folder($deleted_item_web_path); // helpers.phpで定義
+                        } else {
+                            // ファイル削除の場合: ファイル単体のスター情報を解除
+                            remove_star_item($path_from_form, $item_name); // helpers.phpで定義
+                        }
+                        // ★修正終わり
+
+                        rebuild_dir_cache(); // ディレクトリ構造のキャッシュを再構築
+                    } 
+                    else { 
+                        $_SESSION['message'] = ['type' => 'danger', 'text' => ($is_dir ? 'フォルダ' : 'ファイル') . 'の削除に失敗しました。']; 
                     }
-                } else {
-                    $_SESSION['message'] = ['type' => 'danger', 'text' => '対象が見つからないか、削除できないアイテムです。'];
+                } else { 
+                    $_SESSION['message'] = ['type' => 'danger', 'text' => '対象が見つからないか、削除できないアイテムです。']; 
                 }
                 break;
         }

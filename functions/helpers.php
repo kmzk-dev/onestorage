@@ -1,7 +1,5 @@
 <?php
-if (!defined('ONESTORAGE_RUNNING')) {
-    die('Access Denied: Invalid execution context.');
-}
+
 // ランダムな15桁 -data-[15桁]でルートフォルダ名を作成
 function generate_random_string(int $length = 15): string {
     $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -434,4 +432,69 @@ function remove_star_item(string $web_path, string $item_name): bool {
     }
 
     return save_star_config($new_stars);
+}
+
+/**
+ * 削除されたフォルダ内のスターアイテムを .star.json から削除します。
+ * フォルダ削除時のデータ整合性維持に使用されます。
+ * @param string $deleted_folder_path 削除されたフォルダのWebパス (例: Docs/Archive)
+ * @return bool 成功したかどうか
+ */
+function clean_star_items_for_deleted_folder(string $deleted_folder_path): bool
+{
+    $star_file = get_star_config_path();
+
+    if (empty($star_file) || !file_exists($star_file)) {
+        return true; 
+    }
+
+    // load_star_config() を利用してスターデータを読み込む
+    $star_data = load_star_config();
+
+    if (!is_array($star_data)) { 
+        // 読み込みが不正な場合は何もしない
+        return true; 
+    }
+
+    $original_count = count($star_data);
+    $cleaned_data = []; 
+
+    // 検索を容易にするため、削除されたフォルダパスを正規化
+    // 例: 'Docs/Archive'
+    $normalized_deleted_path = trim($deleted_folder_path, '/');
+    // 配下を検索するためのプレフィックス。例: 'Docs/Archive/'
+    $search_prefix = $normalized_deleted_path . '/';
+
+    foreach ($star_data as $item) {
+        $item_path = $item['path']; // スターアイテムの親ディレクトリのWebパス
+        $item_name = $item['name'];
+        
+        // スターアイテムのフルWebパス (ファイル名を含む)
+        $item_full_path = ltrim($item_path . '/' . $item_name, '/');
+
+        // --- フィルタリングロジック ---
+        
+        // 1. 削除されたフォルダ自身がスター登録されていた場合
+        if ($item['is_dir'] && $item_full_path === $normalized_deleted_path) {
+             continue; // スキップ (削除)
+        }
+        
+        // 2. アイテムが削除されたフォルダの配下にある場合
+        // スターアイテムの親パス ($item_path) が $search_prefix で始まるかチェック
+        // 例: $item_path='Docs/Archive/SubFolder' が $search_prefix='Docs/Archive/' で始まる
+        if (str_starts_with($item_path . '/', $search_prefix)) {
+            continue; // スキップ (削除)
+        }
+
+        // 上記に該当しないアイテムのみを新しい配列に追加
+        $cleaned_data[] = $item; 
+    }
+
+    // 変更があった場合のみファイルを書き込み
+    if (count($cleaned_data) < $original_count) {
+        // save_star_config がソートと JSON エンコードを処理する
+        return save_star_config($cleaned_data);
+    }
+
+    return true;
 }

@@ -170,7 +170,7 @@ unset($_SESSION['message']);
 $json_message = json_encode($message);
 
 // ★スターカテゴリ専用の変数
-$STAR_API_URL = 'functions/star_api_function.php';
+$STAR_API_URL = 'functions/star.php';
 $json_star_view = json_encode($is_star_view);
 ?>
 <!DOCTYPE html>
@@ -402,6 +402,7 @@ $json_star_view = json_encode($is_star_view);
         const phpMessage = <?= $json_message ?>;
         const STAR_API_URL = '<?= $STAR_API_URL ?>';
         const isStarView = <?= $json_star_view ?>;
+        console.log(STAR_API_URL)
 
         function showToast(type, message) {
             const toastContainer = document.querySelector('.toast-container');
