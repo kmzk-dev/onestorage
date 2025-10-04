@@ -448,7 +448,6 @@ function clean_star_items_for_deleted_folder(string $deleted_folder_path): bool
         return true; 
     }
 
-    // load_star_config() を利用してスターデータを読み込む
     $star_data = load_star_config();
 
     if (!is_array($star_data)) { 
