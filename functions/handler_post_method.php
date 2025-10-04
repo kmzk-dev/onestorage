@@ -1,4 +1,7 @@
 <?php
+if (!defined('ONESTORAGE_RUNNING')) {
+    die('Access Denied: Invalid execution context.');
+}
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/chunk_upload.php';
 

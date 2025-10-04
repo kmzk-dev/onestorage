@@ -1,4 +1,7 @@
 <?php
+if (!defined('ONESTORAGE_RUNNING')) {
+    die('Access Denied: Invalid execution context.');
+}
 // ランダムな15桁 -data-[15桁]でルートフォルダ名を作成
 function generate_random_string(int $length = 15): string {
     $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';

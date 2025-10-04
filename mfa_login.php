@@ -1,4 +1,5 @@
 <?php
+define('ONESTORAGE_RUNNING', true);
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/helpers.php';
 require_once __DIR__ . '/functions/cookie.php';

@@ -1,4 +1,5 @@
 <?php
+define('ONESTORAGE_RUNNING', true);
 // PHPロジック: 初期設定の状態判定とデータフォルダの強制作成
 require_once __DIR__ . '/path.php';
 require_once __DIR__ . '/functions/helpers.php';
